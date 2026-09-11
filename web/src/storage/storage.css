@@ -1,0 +1,348 @@
+.saved-lake {
+  margin-top: 22px;
+  border-top: 1px solid #e0e6ef;
+  padding-top: 18px;
+  font-size: 13px;
+}
+.saved-heading,
+.saved-tools,
+.saved-preview-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+.saved-heading h2 {
+  font-size: 20px;
+  margin: 0;
+}
+.saved-heading h2 span {
+  font-size: 12px;
+  color: #71829a;
+  font-weight: 400;
+  margin-left: 8px;
+}
+.saved-heading p {
+  font-size: 12px;
+  color: #77859a;
+  margin: 5px 0;
+}
+.saved-tools {
+  margin: 14px 0;
+  font-size: 12px;
+  color: #75849a;
+}
+.saved-tools label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.saved-tools input {
+  font-size: 13px;
+  padding: 8px;
+  border: 1px solid #dce4ef;
+  border-radius: 5px;
+}
+.saved-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr);
+  gap: 15px;
+}
+.saved-layout > div {
+  min-width: 0;
+}
+.saved-files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 340px;
+  overflow: auto;
+  border: 1px solid #e0e6ef;
+  border-radius: 5px;
+}
+.saved-files button {
+  display: block;
+  text-align: left;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid #e7ebf2;
+  background: white;
+  color: #36506e;
+}
+.saved-files button[aria-pressed="true"] {
+  background: #eef4ff;
+}
+.saved-files strong {
+  font-size: 12px;
+  display: block;
+}
+.saved-files small {
+  font-size: 10px;
+  color: #78879c;
+  display: block;
+  overflow-wrap: anywhere;
+}
+.saved-files span {
+  font-size: 11px;
+  color: #6d809a;
+}
+.saved-pages {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  font-size: 11px;
+  color: #7a8b9f;
+}
+.saved-pages button,
+.ingestion-jobs button {
+  border: 1px solid #dce4ef;
+  background: white;
+  color: #385f9a;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.saved-pages button:disabled {
+  opacity: 0.3;
+}
+.saved-preview {
+  border: 1px solid #dfe6ef;
+  border-radius: 5px;
+  padding: 12px;
+}
+.saved-preview h3 {
+  font-size: 14px;
+  margin: 0;
+}
+.saved-preview a {
+  font-size: 11px;
+  color: #1046d5;
+}
+.saved-preview p,
+.saved-preview details {
+  font-size: 11px;
+  line-height: 1.6;
+  color: #75869c;
+}
+.saved-preview code {
+  overflow-wrap: anywhere;
+}
+.stored-records {
+  max-height: 300px;
+  overflow: auto;
+}
+.stored-record {
+  border-bottom: 1px solid #e5ebf2;
+  padding: 7px 0;
+}
+.stored-record > small {
+  font-size: 10px;
+  color: #8391a6;
+}
+.stored-cells {
+  display: flex;
+  min-width: max-content;
+}
+.stored-cells span {
+  font-size: 12px;
+  white-space: pre-wrap;
+  min-width: 80px;
+  max-width: 220px;
+  overflow-wrap: anywhere;
+  border-right: 1px solid #e7ecf2;
+  padding: 4px 9px;
+}
+.stored-record pre {
+  white-space: pre-wrap;
+  font: 12px/1.7 inherit;
+  margin: 5px 0;
+}
+.storage-error {
+  background: #fff7e9;
+  color: #8b6424;
+  border: 1px solid #eddec3;
+  padding: 12px;
+  border-radius: 5px;
+}
+.ingestion-jobs {
+  margin-top: 16px;
+  font-size: 12px;
+}
+.ingestion-jobs summary {
+  cursor: pointer;
+  color: #4f6d94;
+}
+.ingestion-jobs > div {
+  border-bottom: 1px solid #e6ebf3;
+  padding: 8px;
+}
+.ingestion-jobs strong {
+  display: inline-block;
+  font-weight: 500;
+  margin-right: 12px;
+}
+.ingestion-jobs span,
+.ingestion-jobs p {
+  font-size: 11px;
+  color: #7b8b9f;
+}
+.ingestion-jobs button {
+  margin-left: 10px;
+}
+@media (max-width: 700px) {
+  .saved-layout {
+    grid-template-columns: 1fr;
+  }
+  .saved-heading,
+  .saved-tools,
+  .saved-tools label {
+    flex-wrap: wrap;
+  }
+  .saved-preview-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .saved-tools input {
+    max-width: 100%;
+  }
+}
+.page-data-lake.has-saved .compact-workflow {
+  display: none;
+}
+.page-data-lake.has-saved .lake-scene {
+  margin-bottom: 10px;
+}
+.page-data-lake.has-saved .example-entry {
+  margin-top: 6px;
+}
+.dataset-name-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  margin: 10px 0;
+}
+.dataset-name-input input,
+.saved-removal-tools select {
+  border: 1px solid #dce4ed;
+  border-radius: 5px;
+  padding: 6px 9px;
+  font-size: 12px;
+  max-width: 240px;
+  color: #476282;
+  background: white;
+}
+.saved-removal-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+  font-size: 11px;
+  color: #6d7f97;
+}
+.saved-removal-tools label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.saved-files .saved-file-selectable {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  padding-left: 8px;
+}
+.saved-file-selectable > input {
+  margin-top: 14px;
+  accent-color: #1046d5;
+}
+.saved-file-selectable > button {
+  min-width: 0;
+}
+.remove-saved {
+  border: 1px solid #d7acb7;
+  color: #982f4f;
+  background: #fff7f9;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.remove-saved:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.removal-confirmation {
+  border: 1px solid #d8a2b1;
+  background: #fffafb;
+  border-radius: 6px;
+  padding: 14px;
+  margin: 12px 0;
+}
+.removal-confirmation h3 {
+  font-size: 16px;
+  margin: 0 0 10px;
+  color: #89304b;
+}
+.removal-confirmation p,
+.removal-confirmation li {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #7d6470;
+  overflow-wrap: anywhere;
+}
+.removal-confirmation > div {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+.removal-notice {
+  font-size: 12px;
+  color: #50764f;
+  background: #f1f8ef;
+  padding: 10px;
+  border-radius: 5px;
+}
+
+.inference-readiness,
+.model-input-preview {
+  padding: 14px;
+  border: 1px solid #dce4f0;
+  border-radius: 8px;
+  margin: 12px 0;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.inference-readiness summary,
+.model-input-preview summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.model-input-preview pre {
+  max-height: 250px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: #f6f8fc;
+  padding: 10px;
+}
+.inference-readiness button,
+.model-input-preview button {
+  font: inherit;
+  color: #2456ce;
+  background: white;
+  border: 1px solid #c9d8f5;
+  border-radius: 5px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.inference-readiness button:hover,
+.model-input-preview button:hover {
+  background: #f0f5ff;
+}
+.inference-readiness button:disabled,
+.model-input-preview button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
