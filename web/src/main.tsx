@@ -1,6 +1,7 @@
+import { publicFile } from "./showcase/paths";
 import { IntegratedDatasets } from "./integration/IntegratedDatasets";
 import { Settings } from "./settings/Settings";
-import { publicDemo } from "./mode";
+import { publicDemo, savedDemo } from "./mode";
 import { LiveDiscovery, LiveEvidence } from "./discovery/LiveDiscovery";
 import { LakeProfile } from "./inference/LakeProfile";
 import { InferenceReadiness } from "./inference/Readiness";
@@ -170,7 +171,7 @@ function App() {
     );
   }
   function dropFiles(data: DataTransfer) {
-    if (collecting) return;
+    if (collecting || savedDemo) return;
     const controller = new AbortController();
     collection.current = controller;
     setCollecting(true);
@@ -211,7 +212,7 @@ function App() {
           aria-label="IDUN home"
         >
           <span className="brand-mark">
-            <img src="/idun.svg" width="34" height="34" alt="" />
+            <img src={publicFile("idun.svg")} width="34" height="34" alt="" />
           </span>
           <span>
             IDUN
@@ -332,14 +333,14 @@ function App() {
                   <div className="intake-pickers">
                     <button
                       className="primary"
-                      disabled={collecting}
+                      disabled={collecting || savedDemo}
                       onClick={() => folderInput.current?.click()}
                     >
                       Choose folders <Icon name="arrow" size={17} />
                     </button>
                     <button
                       className="secondary"
-                      disabled={collecting}
+                      disabled={collecting || savedDemo}
                       onClick={() => input.current?.click()}
                     >
                       Choose files
@@ -402,7 +403,7 @@ function App() {
               {queue.length > 0 && <IntakeReview intake={intake} />}
               <SavedLake onCount={setSavedCount} />
               <LakeProfile />
-              <InferenceReadiness />
+              {!savedDemo && <InferenceReadiness />}
             </>
           ) : page === "Discover" ? (
             <>

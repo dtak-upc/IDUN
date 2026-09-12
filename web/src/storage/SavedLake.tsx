@@ -1,3 +1,4 @@
+import { savedDemo } from "../mode";
 import { ModelInputPreview } from "../inference/Readiness";
 import { useEffect, useState } from "react";
 import { api, post, type Job } from "./api";
@@ -162,7 +163,7 @@ export function SavedLake({ onCount }: { onCount: (count: number) => void }) {
           <h2>
             Saved data lake <span>{catalog?.total ?? "—"} files</span>
           </h2>
-          <p>Original bytes on this machine · No discovery inference has run</p>
+          <p>{savedDemo ? "Synthetic source records" : "Original bytes on this machine · No discovery inference has run"}</p>
         </div>
         <button className="secondary" onClick={() => setRevision((r) => r + 1)}>
           Refresh saved files
@@ -237,14 +238,14 @@ export function SavedLake({ onCount }: { onCount: (count: number) => void }) {
             </label>
             <button
               className="remove-saved"
-              disabled={!checked.length || removing}
+              disabled={savedDemo || !checked.length || removing}
               onClick={() => previewRemoval({ asset_ids: checked })}
             >
               Remove selected ({checked.length})
             </button>
             <button
               className="remove-saved"
-              disabled={!dataset || removing}
+              disabled={savedDemo || !dataset || removing}
               onClick={() => previewRemoval({ dataset_id: dataset })}
             >
               Remove entire dataset
@@ -371,12 +372,12 @@ export function SavedLake({ onCount }: { onCount: (count: number) => void }) {
                 <>
                   <div className="saved-preview-heading">
                     <h3>{selected.name}</h3>
-                    <a
+                    {!savedDemo && <a
                       href={`/api/v1/assets/${selected.asset_id}/raw`}
                       download
                     >
                       Download original bytes
-                    </a>
+                    </a>}
                   </div>
                   <p>
                     Stored source preview · Names and paths are provenance, not

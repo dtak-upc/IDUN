@@ -1,3 +1,4 @@
+import { savedDemo } from "../mode";
 export function LakeScene({
   count,
   savedCount = 0,
@@ -18,7 +19,7 @@ export function LakeScene({
               : savedCount ? `${savedCount} saved sources. Inspect your lake below or add more files.` : "Start with CSV files and text documents. IDUN will find the connections."}
           </p>
         </div>
-        <span className="session-badge">Local storage</span>
+        <span className="session-badge">{savedDemo ? "Synthetic example" : "Local storage"}</span>
       </div>
       <ol className="compact-workflow">
         <li>

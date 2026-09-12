@@ -1,3 +1,4 @@
+import { savedDemo } from "../mode";
 import { useEffect, useState } from "react";
 import { api, post } from "../storage/api";
 import "./live.css";
@@ -148,7 +149,7 @@ export function LiveDiscovery({
             choose.
           </p>
         </div>
-        <button className="live-primary" disabled={running} onClick={run}>
+        <button className="live-primary" disabled={running || savedDemo} onClick={run}>
           {running ? "LOKI is working…" : "Run LOKI discovery"}
         </button>
       </header>
@@ -163,7 +164,7 @@ export function LiveDiscovery({
             max={1}
             step={0.01}
             value={threshold}
-            disabled={running}
+            disabled={running || savedDemo}
             onChange={(e) => setThreshold(Number(e.target.value))}
           />
         </label>

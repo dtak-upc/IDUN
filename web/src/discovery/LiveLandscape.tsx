@@ -1,3 +1,4 @@
+import { savedDemo } from "../mode";
 import { useEffect, useState } from "react";
 import { api } from "../storage/api";
 import "./landscape.css";
@@ -69,7 +70,7 @@ export function LiveLandscape({
           </h2>
           <p>Explore the tables brought together by text in your lake.</p>
         </div>
-        <span className="lake-live-badge">● Live LOKI results</span>
+        <span className="lake-live-badge">● {savedDemo ? "Saved discovery results" : "Live LOKI results"}</span>
       </div>
       <nav className="lake-landscape-tabs" aria-label="Landscape views">
         <button

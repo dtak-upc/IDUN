@@ -1,8 +1,9 @@
+import { publicFile } from "../showcase/paths";
 import { useEffect, useState } from "react";
 import { api, post } from "../storage/api";
 import { SemanticResults, type SemanticPlan } from "./SemanticResults";
 import "./integration.css";
-import { publicDemo } from "../mode";
+import { publicDemo, savedDemo } from "../mode";
 type Summary = {
   id: string;
   title: string;
@@ -115,7 +116,7 @@ export function IntegratedDatasets({
             min={1}
             max={100}
             value={limit}
-            disabled={running}
+            disabled={savedDemo || running}
             onChange={(e) => setLimit(Number(e.target.value))}
           />
         </label>
@@ -124,7 +125,7 @@ export function IntegratedDatasets({
           <select
             aria-label="Generation timeout"
             value={timeout}
-            disabled={running}
+            disabled={savedDemo || running}
             onChange={(e) => setTimeoutValue(Number(e.target.value))}
           >
             <option value={60}>60 seconds</option>
@@ -134,7 +135,7 @@ export function IntegratedDatasets({
         </label>
         <button
           className="integration-primary"
-          disabled={running || !state?.discovery_ready}
+          disabled={savedDemo || running || !state?.discovery_ready}
           onClick={() =>
             act(async () => {
               setState(await post<State>("/integration", { limit, timeout }));
@@ -217,6 +218,7 @@ export function IntegratedDatasets({
           ) : plan ? (
             <SemanticResults
               key={plan.id}
+              csvHref={savedDemo ? (relation) => publicFile(`demo/${relation || "all"}.csv`) : undefined}
               plan={plan}
               busy={running}
               onEvidence={onEvidence}

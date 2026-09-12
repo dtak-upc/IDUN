@@ -1,3 +1,4 @@
+import { savedDemo } from "../mode";
 import { useEffect, useState } from "react";
 import { api, post } from "../storage/api";
 import "./profiling.css";
@@ -144,7 +145,7 @@ export function LakeProfile() {
             choose.
           </p>
         </div>
-        <button onClick={run} disabled={running}>
+        <button onClick={run} disabled={running || savedDemo}>
           {running ? "Updating index…" : "Profile saved lake"}
         </button>
       </header>

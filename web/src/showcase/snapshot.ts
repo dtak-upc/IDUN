@@ -25,6 +25,9 @@ export type Source = {
   excluded_columns: number;
 };
 export type Snapshot = {
+  assets: import("../storage/api").Job[];
+  routes: Record<string, unknown>;
+  bridges: (Link & {left: string; right: string})[];
   version: number;
   state: {
     revision: string;
@@ -51,7 +54,20 @@ export async function savedApi<T>(path: string): Promise<T> {
   const offset = Math.max(0, Number(url.searchParams.get("offset") || 0));
   const revision = s.state.revision;
   let result: unknown;
-  if (url.pathname === "/discovery") result = s.state;
+  if (url.pathname === "/assets") {
+    const query = (url.searchParams.get("q") || "").toLowerCase();
+    const dataset = url.searchParams.get("dataset");
+    const assets = s.assets.filter(a => a.name.toLowerCase().includes(query) && (!dataset || dataset === a.dataset_id)).map(a => ({...a, path:a.name}));
+    result = {total:s.assets.length, matched:assets.length, offset, assets:assets.slice(offset, offset+25)};
+  } else if (url.pathname === "/integration") {
+    result = {discovery_ready:true, plans:[{...s.plan, stale:false}]};
+  } else if (url.pathname === `/integration/${s.plan.id}`) result = s.plan;
+  else if (url.pathname === "/discovery/links" || url.pathname === "/discovery/bridges") {
+    const links = url.pathname.endsWith("/links") ? s.links.filter(l => !source || l.table === source || l.text === source) : s.bridges;
+    result = {total:links.length, offset, items:links.slice(offset, offset+20)};
+  } else if (s.routes[url.pathname]) {
+    result = s.routes[url.pathname];
+  } else if (url.pathname === "/discovery") result = s.state;
   else if (url.pathname.startsWith("/discovery/links/")) {
     result = s.links.find((l) => l.id === id);
   } else if (url.pathname === "/discovery/workbench") {
