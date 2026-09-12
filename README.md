@@ -2,26 +2,27 @@
 
 Integrating Data-lake of Unstructured Nature.
 
-This repository contains the public research-demo frontend. The planned site is https://dtak-upc.github.io/IDUN/ . The site is not published yet.
+Interactive research demonstration: https://dtak-upc.github.io/IDUN/
 
-## Release status
+## Explore the example
 
-The interface and GitHub Pages workflow are prepared. Independently authored synthetic data must be processed and reviewed before publishing the interactive example. Restricted MIMIC data, clinical passages derived from it, and unpublished research materials are excluded.
+The public site presents saved inference over four independently authored fictional CSV/TXT sources: 120 row-text links and nine joined rows across three relationship tables. Browse source evidence, follow highlighted passages and download relationship-specific CSVs. These are actual saved model outputs on a small explicit demonstration, not a benchmark or a claim of clinical accuracy.
 
-The public demo will show saved source evidence and separate relationship tables. Saved examples do not perform live model inference. A future protected API will support approved live integration requests; GitHub Pages does not run the Python backend.
+The examples contain no real patient records, MIMIC text or unpublished paper figures. See `demo-synthetic/` for the fictional raw inputs. The saved example does not rerun models and remains available without the researcher's PC.
 
-## Build
+Live integration requires a separately hosted, access-controlled backend. It is not enabled in this public release. GitHub Pages hosts static files only.
 
-Requires Node.js 22.12 or later.
+## Build and publish
+
+Use Node.js 22.12 or newer:
 
 ```
 npm ci
 npm run check
-npm run build:showcase
 ```
 
-For publication, add the reviewed synthetic `site-demo/` bundle and its SHA-256 publication manifest, then use `npm run build:pages` with `IDUN_PUBLIC_BASE=/IDUN/`. The build intentionally refuses publication without that bundle. Do not substitute a development database or raw research data.
+Set `IDUN_PUBLIC_BASE=/IDUN/`, then run `npm run build:pages`. The build validates the synthetic bundle against its approved SHA-256 manifest and packages only the static site. Never substitute a research database or raw patient data.
 
-In repository Settings > Pages, choose GitHub Actions as the build source. Dispatch the Publish reviewed IDUN demo workflow only after the public bundle has passed review. The workflow does not run automatically on upload.
+In Settings > Pages, select **GitHub Actions**. The **Publish reviewed IDUN demo** workflow runs on pushes to main or can be dispatched manually. Keep `.github/workflows/pages.yml` in the repository; this hidden directory must be included when uploading files.
 
-Keep the repository's existing GPL-3.0 LICENSE file.
+The backend, credentials, model weights and unpublished research material are intentionally not included in this public frontend repository. See LICENSE for the repository licence.

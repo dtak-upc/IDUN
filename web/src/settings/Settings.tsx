@@ -436,8 +436,10 @@ export function Settings() {
                 </label>
                 <small>
                   Enter the variable’s name, not the secret. Set its value in
-                  the backend environment before starting IDUN. The key stays on
-                  the server and is never returned to the browser.
+                  Windows user environment variables to refresh it without restarting
+                  IDUN. Each connection test and LLM request reads the current value.
+                  Other platforms use the backend process environment. The key stays
+                  on the server and is never returned to the browser.
                 </small>
                 <div className="settings-row">
                   <label>
