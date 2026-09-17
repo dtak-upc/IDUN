@@ -439,7 +439,17 @@
 /* Responsive adjustments */
 @media (max-width: 1100px) {
   .lake-select-wrap select {
-    max-width: 110px;
+    max-width: 72px;
+  }
+  .lake-btn-new span {
+    display: none;
+  }
+  .lake-btn-new {
+    padding: 0 4px;
+  }
+  .lake-pill {
+    gap: 4px;
+    padding: 2px;
   }
 }
 

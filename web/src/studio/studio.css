@@ -862,22 +862,28 @@ body {
   .studio-session {
     display: none;
   }
+  .studio-app .brand-caption {
+    display: none;
+  }
   .studio-app .sidebar {
     justify-content: space-between;
-    padding-inline: 12px;
-    gap: 8px;
+    padding-inline: 10px;
+    gap: 6px;
   }
   .studio-app .brand {
     flex-basis: auto;
-    gap: 8px;
+    gap: 6px;
+  }
+  .studio-app .sidebar nav {
+    gap: 2px;
   }
   .studio-app main {
     padding: 16px 14px 0;
   }
   .studio-app .nav-item {
-    padding: 7px 8px;
-    font-size: 13px;
-    gap: 5px;
+    padding: 6px 6px;
+    font-size: 12.5px;
+    gap: 4px;
   }
 }
 @media (max-width: 760px) {
@@ -1079,7 +1085,7 @@ body {
 /* Settings is a workspace utility, anchored at the right of the header. */
 .studio-header-actions{display:flex;align-items:center;gap:16px;flex-shrink:0;margin-left:auto}
 .studio-app .settings-corner{display:flex;align-items:center}
-@media(max-width:1100px){.studio-app .settings-corner{padding:8px}.settings-corner>span{display:none}}
+@media(max-width:1100px){.studio-header-actions{gap:6px}.studio-app .settings-corner{padding:6px}.settings-corner>span{display:none}}
 @media(max-width:760px){.studio-header-actions{position:absolute;right:12px;top:14px}.studio-app .brand{padding-inline:35px}.studio-app .settings-corner{background:#f5f7fb}}
 
 /* Logout Button & Shutdown UI */
@@ -1097,7 +1103,7 @@ body {
 }
 @media (max-width: 1100px) {
   .studio-app .logout-corner {
-    padding: 8px;
+    padding: 6px;
   }
   .logout-corner > span {
     display: none;

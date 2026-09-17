@@ -145,6 +145,14 @@ function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) =
   async function handleLogout(force = false) {
     setShuttingDown(true);
     setShutdownError("");
+    if (publicDemo) {
+      setTimeout(() => {
+        setShowLogoutModal(false);
+        setIsShutDown(true);
+        setShuttingDown(false);
+      }, 350);
+      return;
+    }
     try {
       const response = await fetch("/api/v1/session/logout", {
         method: "POST",
@@ -247,6 +255,19 @@ function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) =
           <div className="shutdown-hint">
             To start IDUN again in the future, run <code>Start_IDUN.bat</code> or <code>npm start</code> in your terminal.
           </div>
+          {publicDemo && (
+            <button
+              type="button"
+              className="primary"
+              style={{ marginTop: "20px", display: "inline-flex", alignItems: "center", gap: "8px" }}
+              onClick={() => {
+                setIsShutDown(false);
+                setShuttingDown(false);
+              }}
+            >
+              <Icon name="arrow" size={16} /> Return to Demo Workspace
+            </button>
+          )}
         </div>
       </div>
     );
@@ -320,32 +341,28 @@ function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) =
             <i /> {publicDemo ? "YOUR DEMO WORKSPACE" : "LOCAL WORKSPACE"}{" "}
             <span>LOKI + THOR</span>
           </div>
-          {!publicDemo && (
-            <button
-              className={`nav-item settings-corner ${page === "Settings" ? "active" : ""}`}
-              aria-current={page === "Settings" ? "page" : undefined}
-              onClick={() => setPage("Settings")}
-              title="Settings"
-              aria-label="Settings"
-            >
-              <Icon name="settings" />
-              <span>Settings</span>
-            </button>
-          )}
-          {!publicDemo && (
-            <button
-              className="nav-item logout-corner"
-              onClick={() => {
-                setShutdownError("");
-                setShowLogoutModal(true);
-              }}
-              title="Logout & shut down IDUN"
-              aria-label="Logout"
-            >
-              <Icon name="logout" />
-              <span>Logout</span>
-            </button>
-          )}
+          <button
+            className={`nav-item settings-corner ${page === "Settings" ? "active" : ""}`}
+            aria-current={page === "Settings" ? "page" : undefined}
+            onClick={() => setPage("Settings")}
+            title="Settings"
+            aria-label="Settings"
+          >
+            <Icon name="settings" />
+            <span>Settings</span>
+          </button>
+          <button
+            className="nav-item logout-corner"
+            onClick={() => {
+              setShutdownError("");
+              setShowLogoutModal(true);
+            }}
+            title="Logout & shut down IDUN"
+            aria-label="Logout"
+          >
+            <Icon name="logout" />
+            <span>Logout</span>
+          </button>
         </div>
       </aside>
       <div className="workspace-main">

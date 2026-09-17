@@ -37,7 +37,6 @@ export function IntegratedDatasets({
   const [limit, setLimit] = useState(12);
   const [timeout, setTimeoutValue] = useState(120);
   useEffect(() => {
-    if (publicDemo) return;
     let active = true;
     api<{settings: {llm: {timeout_seconds: number}}}>("/settings").then(r => {
       if (active) setTimeoutValue(r.settings.llm.timeout_seconds);
@@ -185,7 +184,7 @@ export function IntegratedDatasets({
               {unloading ? "Unloading…" : `⚡ Unload LLM (${hfLoaded.repo_id.split("/").pop()})`}
             </button>
           )}
-          {!publicDemo && <button onClick={onSettings}>LLM settings</button>}
+          <button onClick={onSettings}>LLM settings</button>
         </div>
       </div>
       <div className="integration-start">

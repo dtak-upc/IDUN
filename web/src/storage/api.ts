@@ -24,11 +24,7 @@ export async function api<T>(path: string, init?: RequestInit, lake = activeLake
       .querySelector('meta[name="idun-mode"]')
       ?.getAttribute("content") === "showcase"
   ) {
-    if (init?.method && init.method !== "GET")
-      throw Error(
-        "The public example is read-only. Request access for live inference.",
-      );
-    return (await import("../showcase/snapshot")).savedApi<T>(path);
+    return (await import("../showcase/snapshot")).savedApi<T>(path, init, lake);
   }
   let response: Response;
   try {

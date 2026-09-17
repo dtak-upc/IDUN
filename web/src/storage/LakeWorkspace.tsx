@@ -15,7 +15,6 @@ export function LakeWorkspace({children}: {children: (lake?: Lake, onChange?: (l
     setLake(next);
   }
   useEffect(() => {
-    if (publicDemo) return;
     let active = true;
     api<Listing>("/lakes").then(r => {
       const id = localStorage.getItem("idun.selectedLake") || r.default_id;
@@ -23,10 +22,6 @@ export function LakeWorkspace({children}: {children: (lake?: Lake, onChange?: (l
     }).catch(e => {if (active) setError(e.message);});
     return () => {active = false;};
   }, [retry]);
-  if (publicDemo) {
-    const demoLake: Lake = { id: "demo", name: "Demo" };
-    return children(demoLake, () => {});
-  }
   if (!lake) return <main className="lake-loading"><h1>IDUN</h1>{error ? <><p role="alert">{error}</p><button onClick={() => {setError(""); setRetry(r => r+1);}}>Reconnect</button></> : <p>Opening your lakes…</p>}</main>;
   return children(lake, choose);
 }
@@ -43,7 +38,6 @@ export function LakeSelector({lake, onChange, blocked}: {lake: Lake; onChange: (
   const [menuEl, setMenuEl] = useState<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (publicDemo) return;
     let active = true;
     api<Listing>("/lakes").then(r => {if(active) setLakes(r.lakes);}).catch(e => {if(active) setError(e.message);});
     return () => {active = false;};
@@ -90,7 +84,7 @@ export function LakeSelector({lake, onChange, blocked}: {lake: Lake; onChange: (
           <select
             aria-label="Active data lake"
             value={lake.id}
-            disabled={blocked || busy || publicDemo}
+            disabled={blocked || busy}
             onChange={e => onChange(lakes.find(l => l.id === e.target.value)!)}
           >
             {lakes.map(l => (
@@ -107,46 +101,42 @@ export function LakeSelector({lake, onChange, blocked}: {lake: Lake; onChange: (
         </div>
       </div>
 
-      {!publicDemo && (
-        <>
-          <div className="lake-divider" aria-hidden="true" />
+      <div className="lake-divider" aria-hidden="true" />
 
-          {/* Action buttons: New lake + Options menu */}
-          <div className="lake-actions">
-            <button
-              type="button"
-              className="lake-btn lake-btn-new"
-              disabled={blocked || busy}
-              aria-label="New lake"
-              title="Create new lake"
-              onClick={() => { setName(""); setEditing("new"); setMenuOpen(false); }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              <span>New lake</span>
-            </button>
+      {/* Action buttons: New lake + Options menu */}
+      <div className="lake-actions">
+        <button
+          type="button"
+          className="lake-btn lake-btn-new"
+          disabled={blocked || busy}
+          aria-label="New lake"
+          title="Create new lake"
+          onClick={() => { setName(""); setEditing("new"); setMenuOpen(false); }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          <span>New lake</span>
+        </button>
 
-            <button
-              type="button"
-              className={`lake-btn lake-btn-menu ${menuOpen ? "active" : ""}`}
-              disabled={busy}
-              aria-label="Lake actions"
-              aria-haspopup="true"
-              aria-expanded={menuOpen}
-              title="Lake options (Rename, Delete)"
-              onClick={() => setMenuOpen(prev => !prev)}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="1.5" />
-                <circle cx="19" cy="12" r="1.5" />
-                <circle cx="5" cy="12" r="1.5" />
-              </svg>
-            </button>
-          </div>
-        </>
-      )}
+        <button
+          type="button"
+          className={`lake-btn lake-btn-menu ${menuOpen ? "active" : ""}`}
+          disabled={busy}
+          aria-label="Lake actions"
+          aria-haspopup="true"
+          aria-expanded={menuOpen}
+          title="Lake options (Rename, Delete)"
+          onClick={() => setMenuOpen(prev => !prev)}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="1.5" />
+            <circle cx="19" cy="12" r="1.5" />
+            <circle cx="5" cy="12" r="1.5" />
+          </svg>
+        </button>
+      </div>
 
       {/* Options dropdown menu */}
       {menuOpen && (
