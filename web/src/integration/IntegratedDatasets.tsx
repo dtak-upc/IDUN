@@ -203,7 +203,7 @@ export function IntegratedDatasets({
             min={1}
             max={100}
             value={limit}
-            disabled={savedDemo || running}
+            disabled={running}
             onChange={(e) => setLimit(Number(e.target.value))}
           />
         </label>
@@ -215,7 +215,7 @@ export function IntegratedDatasets({
             min={0}
             step={1}
             value={timeout}
-            disabled={savedDemo || running}
+            disabled={running}
             onChange={(e) => setTimeoutValue(Number(e.target.value))}
           />
           <small>Seconds · 0 = no timeout</small>
@@ -240,7 +240,7 @@ export function IntegratedDatasets({
         </div>
         <button
           className="integration-primary"
-          disabled={savedDemo || running || !state?.discovery_ready}
+          disabled={running || !state?.discovery_ready}
           onClick={() =>
             act(async () => {
               setState(await post<State>("/integration", {
@@ -254,7 +254,7 @@ export function IntegratedDatasets({
         >
           {state?.resume ? `Resume original batch (${state.resume.completed}/${state.resume.total})` : "Propose with LLM"}
         </button>
-        {state?.resume && <button disabled={running || savedDemo} onClick={()=>act(async()=>{
+        {state?.resume && <button disabled={running} onClick={()=>act(async()=>{
           setState(await post<State>("/integration",{limit,timeout,new_batch:true,schema_config:schemaConfig}));setSelected("");
         })}>Start a new batch instead</button>}
       </div>
@@ -328,72 +328,70 @@ export function IntegratedDatasets({
                 </small>
               </div>
 
-              {!savedDemo && (
-                <div className="run-card-action-wrap">
-                  <button
-                    type="button"
-                    className={`run-card-menu-btn ${menuOpenRunId === p.id ? "active" : ""}`}
-                    aria-label={`Edit ${p.title}`}
-                    aria-haspopup="true"
-                    aria-expanded={menuOpenRunId === p.id}
-                    title="Edit run (Rename, Remove)"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setMenuOpenRunId((curr) => (curr === p.id ? null : p.id));
-                    }}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M8 4H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                      <line x1="9" y1="12" x2="12" y2="15" />
-                      <line x1="16.5" y1="4.5" x2="19.5" y2="7.5" />
-                    </svg>
-                  </button>
+              <div className="run-card-action-wrap">
+                <button
+                  type="button"
+                  className={`run-card-menu-btn ${menuOpenRunId === p.id ? "active" : ""}`}
+                  aria-label={`Edit ${p.title}`}
+                  aria-haspopup="true"
+                  aria-expanded={menuOpenRunId === p.id}
+                  title="Edit run (Rename, Remove)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuOpenRunId((curr) => (curr === p.id ? null : p.id));
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M8 4H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    <line x1="9" y1="12" x2="12" y2="15" />
+                    <line x1="16.5" y1="4.5" x2="19.5" y2="7.5" />
+                  </svg>
+                </button>
 
-                  {menuOpenRunId === p.id && (
-                    <div className="lake-dropdown-menu run-dropdown-menu" role="menu" onClick={(e) => e.stopPropagation()}>
-                      <div className="lake-dropdown-header">
-                        <span className="lake-dropdown-kicker">INTEGRATION RUN</span>
-                        <span className="lake-dropdown-current" title={p.title}>{p.title}</span>
-                      </div>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="lake-dropdown-item"
-                        disabled={running}
-                        onClick={() => {
-                          setRunName(p.title);
-                          setRenaming(p.id);
-                          setMenuOpenRunId(null);
-                        }}
-                      >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                          <path d="m15 5 4 4" />
-                        </svg>
-                        <span>Rename run</span>
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="lake-dropdown-item lake-dropdown-danger"
-                        disabled={running}
-                        onClick={() => {
-                          setRemoving(p);
-                          setMenuOpenRunId(null);
-                        }}
-                      >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                          <line x1="10" y1="11" x2="10" y2="17" />
-                          <line x1="14" y1="11" x2="14" y2="17" />
-                        </svg>
-                        <span>Remove run</span>
-                      </button>
+                {menuOpenRunId === p.id && (
+                  <div className="lake-dropdown-menu run-dropdown-menu" role="menu" onClick={(e) => e.stopPropagation()}>
+                    <div className="lake-dropdown-header">
+                      <span className="lake-dropdown-kicker">INTEGRATION RUN</span>
+                      <span className="lake-dropdown-current" title={p.title}>{p.title}</span>
                     </div>
-                  )}
-                </div>
-              )}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="lake-dropdown-item"
+                      disabled={running}
+                      onClick={() => {
+                        setRunName(p.title);
+                        setRenaming(p.id);
+                        setMenuOpenRunId(null);
+                      }}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                        <path d="m15 5 4 4" />
+                      </svg>
+                      <span>Rename run</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="lake-dropdown-item lake-dropdown-danger"
+                      disabled={running}
+                      onClick={() => {
+                        setRemoving(p);
+                        setMenuOpenRunId(null);
+                      }}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                        <line x1="10" y1="11" x2="10" y2="17" />
+                        <line x1="14" y1="11" x2="14" y2="17" />
+                      </svg>
+                      <span>Remove run</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </aside>

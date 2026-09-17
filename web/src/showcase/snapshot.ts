@@ -1,5 +1,5 @@
 import { publicFile } from "./paths";
-import type { SemanticPlan } from "../integration/SemanticResults";
+import type { SemanticPlan, DiffData } from "../integration/SemanticResults";
 export type Link = {
   id: string;
   table: string;
@@ -50,6 +50,172 @@ let mockLakes: { id: string; name: string; files: number }[] = [
   { id: "demo", name: "Demo", files: 4 },
   { id: "secondary-demo", name: "Secondary Demo Lake", files: 0 },
 ];
+
+let mockPlans: (SemanticPlan & { created?: number; stale?: boolean })[] | null = null;
+
+function ensureMockPlans(s: Snapshot) {
+  if (mockPlans) return mockPlans;
+
+  // Run 1: Baseline Schema Extraction (earlier, strict rule pass, 7 rows)
+  const baselineOutput = [
+    s.plan.output[0], // Nausea - Metformin (ADVERSE_EFFECT)
+    s.plan.output[2], // Confusion - Zolpidem (ADVERSE_EFFECT)
+    s.plan.output[3], // Confusion - Zolpidem (DISCONTINUED)
+    s.plan.output[4], // Insomnia - Zolpidem (DISCONTINUED)
+    s.plan.output[5], // Insomnia - Zolpidem (TREATS)
+    s.plan.output[6], // Asthma - Albuterol (TREATS)
+    {
+      ...s.plan.output[8],
+      relation: "NEGATIVE",
+      evidence_quote: "Patient reported past history of diabetes without active continuation note in initial intake summary.",
+    },
+  ];
+
+  const baselinePlan: SemanticPlan & { created?: number; stale?: boolean } = {
+    ...s.plan,
+    id: "7a9f12d8e05c4b31a89c6298517240fa",
+    title: "Baseline Schema Extraction",
+    description: "Initial rule-grounded schema extraction on synthetic clinic notes prior to cross-encoder refinement.",
+    materialized: false,
+    stale: true,
+    model: "meta-llama/Llama-3.2-3B-Instruct",
+    seconds: 2.8,
+    counts: { include: 4, abstain: 8, conflict: 0 },
+    coverage: {
+      ...s.plan.coverage,
+      reviewed: 10,
+      available_pairs: 12,
+    },
+    pipeline: {
+      model: "meta-llama/Llama-3.2-3B-Instruct",
+      device: "cuda",
+      clustering: "hdbscan",
+    },
+    cases: s.plan.cases.slice(0, 4),
+    decisions: s.plan.decisions.slice(0, 4),
+    output: baselineOutput,
+    created: 1726000000,
+  };
+
+  // Run 2: Refined Clinical Relation Synthesis (current, 9 rows)
+  const refinedPlan: SemanticPlan & { created?: number; stale?: boolean } = {
+    ...s.plan,
+    id: s.plan.id,
+    title: s.plan.title || "Refined Clinical Relation Synthesis",
+    materialized: true,
+    stale: false,
+    created: 1726086400,
+    model: s.plan.model || "ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF",
+  };
+
+  mockPlans = [refinedPlan, baselinePlan];
+  return mockPlans;
+}
+
+function getMockDiff(targetId: string, s: Snapshot): DiffData {
+  const plans = ensureMockPlans(s);
+  const targetIndex = plans.findIndex(p => p.id === targetId);
+  const currentPlan = targetIndex >= 0 ? plans[targetIndex] : plans[0];
+  const previousPlan = targetIndex >= 0 && targetIndex + 1 < plans.length ? plans[targetIndex + 1] : null;
+
+  if (!previousPlan) {
+    return {
+      has_previous: false,
+      current: {
+        id: currentPlan.id,
+        title: currentPlan.title,
+        created: currentPlan.created || 1726000000,
+        model: currentPlan.model,
+      },
+      previous: null,
+      counts: {
+        added: 0,
+        changed: 0,
+        withdrawn: 0,
+        unchanged: currentPlan.output.length,
+        total_current: currentPlan.output.length,
+        total_previous: 0,
+      },
+      rows: currentPlan.output.map(r => ({ ...r, diff_status: "unchanged" })),
+    };
+  }
+
+  // Comparing Run 2 vs Run 1
+  if (currentPlan.id === s.plan.id && previousPlan.id === "7a9f12d8e05c4b31a89c6298517240fa") {
+    return {
+      has_previous: true,
+      current: {
+        id: currentPlan.id,
+        title: currentPlan.title,
+        created: currentPlan.created || 1726086400,
+        model: currentPlan.model,
+      },
+      previous: {
+        id: previousPlan.id,
+        title: previousPlan.title,
+        created: previousPlan.created || 1726000000,
+        model: previousPlan.model,
+      },
+      counts: {
+        added: 2,
+        changed: 1,
+        withdrawn: 0,
+        unchanged: 6,
+        total_current: 9,
+        total_previous: 7,
+      },
+      rows: [
+        { ...s.plan.output[0], diff_status: "unchanged" },
+        {
+          ...s.plan.output[1],
+          diff_status: "added",
+          diff_notes: "Newly synthesized from follow-up note narrative passage.",
+        },
+        { ...s.plan.output[2], diff_status: "unchanged" },
+        { ...s.plan.output[3], diff_status: "unchanged" },
+        { ...s.plan.output[4], diff_status: "unchanged" },
+        { ...s.plan.output[5], diff_status: "unchanged" },
+        { ...s.plan.output[6], diff_status: "unchanged" },
+        {
+          ...s.plan.output[7],
+          diff_status: "added",
+          diff_notes: "Extracted after multi-hop context resolution from provider instructions.",
+        },
+        {
+          ...s.plan.output[8],
+          diff_status: "changed",
+          previous_relation: "NEGATIVE",
+          diff_notes: "Refined prompt and threshold confirmed maintenance therapy from clinical note narrative.",
+        },
+      ],
+    };
+  }
+
+  return {
+    has_previous: true,
+    current: {
+      id: currentPlan.id,
+      title: currentPlan.title,
+      created: currentPlan.created || Math.floor(Date.now() / 1000),
+      model: currentPlan.model,
+    },
+    previous: {
+      id: previousPlan.id,
+      title: previousPlan.title,
+      created: previousPlan.created || Math.floor(Date.now() / 1000) - 3600,
+      model: previousPlan.model,
+    },
+    counts: {
+      added: 0,
+      changed: 0,
+      withdrawn: 0,
+      unchanged: currentPlan.output.length,
+      total_current: currentPlan.output.length,
+      total_previous: previousPlan.output.length,
+    },
+    rows: currentPlan.output.map(r => ({ ...r, diff_status: "unchanged" })),
+  };
+}
 
 let mockConfig = {
   api_python: "C:\\Users\\IDUN\\miniconda3\\envs\\THOR\\python.exe",
@@ -333,74 +499,147 @@ export async function savedApi<T>(path: string, init?: RequestInit, lake = ""): 
   } else if (url.pathname === "/integration") {
     if (lake && lake !== "demo") {
       result = { discovery_ready: false, plans: [] };
+    } else if (method === "POST") {
+      const plans = ensureMockPlans(s);
+      const timeStr = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      const newId = "run-" + Date.now().toString(16).slice(-8);
+      const newPlan: SemanticPlan & { created?: number; stale?: boolean } = {
+        ...s.plan,
+        id: newId,
+        title: `Proposed Synthesis (${timeStr})`,
+        description: `Interactive candidate batch proposed with ${mockConfig.llm.model || "Llama-3.2-3B"}.`,
+        created: Math.floor(Date.now() / 1000),
+        materialized: false,
+        stale: false,
+        model: mockConfig.llm.model || "meta-llama/Llama-3.2-3B-Instruct",
+        counts: { include: 6, abstain: 6, conflict: 0 },
+      };
+      plans.unshift(newPlan);
+      result = {
+        discovery_ready: true,
+        plans: plans.map(p => ({
+          id: p.id,
+          title: p.title,
+          model: p.model,
+          created: p.created,
+          materialized: p.materialized,
+          stale: p.stale ?? false,
+          counts: p.counts,
+        })),
+      };
     } else {
-      result = { discovery_ready: true, plans: [{ ...s.plan, stale: false }] };
+      const plans = ensureMockPlans(s);
+      result = {
+        discovery_ready: true,
+        plans: plans.map(p => ({
+          id: p.id,
+          title: p.title,
+          model: p.model,
+          created: p.created,
+          materialized: p.materialized,
+          stale: p.stale ?? false,
+          counts: p.counts,
+        })),
+      };
     }
-  } else if (url.pathname === `/integration/${s.plan.id}`) {
-    result = s.plan;
-  } else if (url.pathname.endsWith("/diff")) {
+  } else if (url.pathname === "/integration/cancel") {
+    const plans = ensureMockPlans(s);
     result = {
-      baseline_id: "",
-      current_id: id,
-      added: [],
-      removed: [],
-      unchanged: s.plan.output.length,
+      discovery_ready: true,
+      plans: plans.map(p => ({
+        id: p.id,
+        title: p.title,
+        model: p.model,
+        created: p.created,
+        materialized: p.materialized,
+        stale: p.stale ?? false,
+        counts: p.counts,
+      })),
     };
-  } else if (url.pathname === "/integration/schema/defaults") {
-    result = {
-      modes: ["strict", "hybrid", "open"],
-      default_mode: "strict",
-      defaults: [
-        { label: "TREATS", definition: "Medication prescribed, started or continued to manage diagnosis.", enabled: true },
-        { label: "ADVERSE_EFFECT", definition: "Medication caused, worsened or suspected to cause symptom.", enabled: true },
-        { label: "DISCONTINUED", definition: "Medication stopped, held or switched away from.", enabled: true },
-        { label: "CONTRAINDICATED", definition: "Medication unsafe/inappropriate for this diagnosis/context.", enabled: true },
-        { label: "NEGATIVE", definition: "Evidence indicates medication is for a different diagnosis.", enabled: true },
-        { label: "UNRESOLVED", definition: "Insufficient evidence in narrative to determine relationship.", enabled: true },
-      ],
-    };
-  } else if (url.pathname === "/integration/schema/probe") {
-    result = {
-      probed_count: 4,
-      available_pairs: 12,
-      defaults: [
-        { label: "TREATS", definition: "Medication prescribed, started or continued to manage diagnosis.", enabled: true },
-        { label: "ADVERSE_EFFECT", definition: "Medication caused, worsened or suspected to cause symptom.", enabled: true },
-        { label: "DISCONTINUED", definition: "Medication stopped, held or switched away from.", enabled: true },
-        { label: "CONTRAINDICATED", definition: "Medication unsafe/inappropriate for this diagnosis/context.", enabled: true },
-        { label: "NEGATIVE", definition: "Evidence indicates medication is for a different diagnosis.", enabled: true },
-        { label: "UNRESOLVED", definition: "Insufficient evidence in narrative to determine relationship.", enabled: true },
-      ],
-      suggestions: [
-        {
-          label: "TREATS",
-          definition: "Medication prescribed, started or continued to manage diagnosis.",
-          occurrences: 3,
-          is_default: true,
-          sample_quotes: [
-            { diagnosis: "Hypertension", medication: "Lisinopril", quote: "Initiated lisinopril 10 mg daily for blood pressure control." },
-          ],
-        },
-        {
-          label: "ADVERSE_EFFECT",
-          definition: "Medication caused, worsened or suspected to cause symptom.",
-          occurrences: 2,
-          is_default: true,
-          sample_quotes: [
-            { diagnosis: "Dry cough", medication: "Lisinopril", quote: "Patient developed persistent non-productive dry cough after starting ACE inhibitor." },
-          ],
-        },
-        {
-          label: "DISCONTINUED",
-          definition: "Medication stopped, held or switched away from.",
-          occurrences: 4,
-          is_default: true,
-          sample_quotes: [
-            { diagnosis: "Cough", medication: "Lisinopril", quote: "Discontinued lisinopril due to intolerable cough." },
-          ],
-        },
-      ],
-    };
+  } else if (url.pathname.startsWith("/integration/")) {
+    const segments = url.pathname.split("/");
+    const targetId = segments[2];
+    const action = segments[3];
+    if (url.pathname === "/integration/schema/defaults") {
+      result = {
+        modes: ["strict", "hybrid", "open"],
+        default_mode: "strict",
+        defaults: [
+          { label: "TREATS", definition: "Medication prescribed, started or continued to manage diagnosis.", enabled: true },
+          { label: "ADVERSE_EFFECT", definition: "Medication caused, worsened or suspected to cause symptom.", enabled: true },
+          { label: "DISCONTINUED", definition: "Medication stopped, held or switched away from.", enabled: true },
+          { label: "CONTRAINDICATED", definition: "Medication unsafe/inappropriate for this diagnosis/context.", enabled: true },
+          { label: "NEGATIVE", definition: "Evidence indicates medication is for a different diagnosis.", enabled: true },
+          { label: "UNRESOLVED", definition: "Insufficient evidence in narrative to determine relationship.", enabled: true },
+        ],
+      };
+    } else if (url.pathname === "/integration/schema/probe") {
+      result = {
+        probed_count: 4,
+        available_pairs: 12,
+        defaults: [
+          { label: "TREATS", definition: "Medication prescribed, started or continued to manage diagnosis.", enabled: true },
+          { label: "ADVERSE_EFFECT", definition: "Medication caused, worsened or suspected to cause symptom.", enabled: true },
+          { label: "DISCONTINUED", definition: "Medication stopped, held or switched away from.", enabled: true },
+          { label: "CONTRAINDICATED", definition: "Medication unsafe/inappropriate for this diagnosis/context.", enabled: true },
+          { label: "NEGATIVE", definition: "Evidence indicates medication is for a different diagnosis.", enabled: true },
+          { label: "UNRESOLVED", definition: "Insufficient evidence in narrative to determine relationship.", enabled: true },
+        ],
+        suggestions: [
+          {
+            label: "TREATS",
+            definition: "Medication prescribed, started or continued to manage diagnosis.",
+            occurrences: 3,
+            is_default: true,
+            sample_quotes: [
+              { diagnosis: "Hypertension", medication: "Lisinopril", quote: "Initiated lisinopril 10 mg daily for blood pressure control." },
+            ],
+          },
+          {
+            label: "ADVERSE_EFFECT",
+            definition: "Medication caused, worsened or suspected to cause symptom.",
+            occurrences: 2,
+            is_default: true,
+            sample_quotes: [
+              { diagnosis: "Dry cough", medication: "Lisinopril", quote: "Patient developed persistent non-productive dry cough after starting ACE inhibitor." },
+            ],
+          },
+          {
+            label: "DISCONTINUED",
+            definition: "Medication stopped, held or switched away from.",
+            occurrences: 4,
+            is_default: true,
+            sample_quotes: [
+              { diagnosis: "Cough", medication: "Lisinopril", quote: "Discontinued lisinopril due to intolerable cough." },
+            ],
+          },
+        ],
+      };
+    } else if (action === "diff") {
+      result = getMockDiff(targetId, s);
+    } else if (action === "rename") {
+      const plans = ensureMockPlans(s);
+      const target = plans.find(p => p.id === targetId);
+      if (target) target.title = (body.title || target.title).trim();
+      result = { ok: true, id: targetId, title: target?.title || body.title };
+    } else if (action === "remove") {
+      const plans = ensureMockPlans(s);
+      mockPlans = plans.filter(p => p.id !== targetId);
+      if (mockPlans.length === 0) {
+        mockPlans = null;
+        ensureMockPlans(s);
+      }
+      result = { removed: targetId };
+    } else if (action === "materialize") {
+      const plans = ensureMockPlans(s);
+      const target = plans.find(p => p.id === targetId);
+      if (target) target.materialized = true;
+      result = { ok: true, id: targetId };
+    } else {
+      const plans = ensureMockPlans(s);
+      const target = plans.find(p => p.id === targetId);
+      result = target || s.plan;
+    }
   } else if (url.pathname === "/discovery/links" || url.pathname === "/discovery/bridges") {
     if (lake && lake !== "demo") {
       result = { total: 0, offset, items: [] };
