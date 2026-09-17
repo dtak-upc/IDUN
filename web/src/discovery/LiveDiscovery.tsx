@@ -1,5 +1,5 @@
 import { savedDemo } from "../mode";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, post } from "../storage/api";
 import "./live.css";
 import { LiveLandscape } from "./LiveLandscape";
@@ -60,7 +60,7 @@ type Result = {
     seconds: number;
   };
 };
-type Page<T> = { total: number; offset: number; items: T[] };
+type Page<T> = { revision?: string; total: number; offset: number; items: T[] };
 export function LiveDiscovery({
   onOpenEvidence,
   onIntake,
@@ -68,6 +68,7 @@ export function LiveDiscovery({
   onOpenEvidence: (id: string, companion?: string) => void;
   onIntake: () => void;
 }) {
+  const epoch = useRef(0);
   const [result, setResult] = useState<Result>();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -90,43 +91,48 @@ export function LiveDiscovery({
   const items = loadedPage?.key === queryKey ? loadedPage.data : undefined;
   useEffect(() => {
     let active = true;
+    const controller=new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
     async function refresh() {
+      const requestEpoch=epoch.current;
       try {
-        const r = await api<Result>("/discovery");
-        if (active) setResult(r);
+        const r = await api<Result>("/discovery",{signal:controller.signal});
+        if (active && requestEpoch===epoch.current) {setResult(r);setError("");}
       } catch (e) {
         if (active) setError(String(e));
-      }
+      } finally {if(active) timer=setTimeout(refresh,2000);}
     }
     void refresh();
-    const timer = setInterval(refresh, 2000);
     return () => {
       active = false;
-      clearInterval(timer);
+      clearTimeout(timer);controller.abort();
     };
   }, []);
   useEffect(() => {
-    let active = true;
+    setPage(0);
+    if(source && result?.sources && !result.sources.some(s=>s.id===source)) setSource("");
+  }, [result?.revision]);
+  useEffect(() => {
+    let active=true;
+    let timer: ReturnType<typeof setTimeout>;
+    const controller=new AbortController();
     setLoadedPage(undefined);
-    if (result?.status === "ready")
-      void api<Page<Link | Bridge>>(
-        `/discovery/${view}?offset=${page * 20}&source=${encodeURIComponent(source)}`,
-      )
-        .then((r) => {
-          if (active) setLoadedPage({ key: queryKey, data: r });
-        })
-        .catch((e) => {
-          if (active) setError(String(e));
-        });
-    return () => {
-      active = false;
-    };
+    async function load() {
+      try {
+        const r=await api<Page<Link | Bridge>>(`/discovery/${view}?offset=${page*20}&source=${encodeURIComponent(source)}`,{signal:controller.signal});
+        if(r.revision && r.revision!==result?.revision) throw Error('Discovery changed; refreshing results…');
+        if(active){setLoadedPage({key:queryKey,data:r});setError("");}
+      } catch(e){if(active){setError(String(e));timer=setTimeout(load,1500);}}
+    }
+    if(result?.status==='ready') void load();
+    return ()=>{active=false;clearTimeout(timer);controller.abort();};
   }, [queryKey]);
   const running =
     busy ||
     ["queued", "running", "cancelling"].includes(result?.job?.status || "");
   const names = new Map(result?.sources?.map((s) => [s.id, s.name]) || []);
   async function run() {
+    epoch.current++;
     setBusy(true);
     setError("");
     try {
@@ -169,8 +175,8 @@ export function LiveDiscovery({
           />
         </label>
         <p>
-          Checkpoint default: 0.15, uncalibrated for this raw lake. Retain up to
-          three text units per row. Scores are not probabilities.
+          Checkpoint default: 0.15, uncalibrated for this raw lake. Keep bounded
+          join candidates and their evidence. Scores are not probabilities.
         </p>
       </details>
       {error && <p role="alert">{error}</p>}
@@ -211,8 +217,9 @@ export function LiveDiscovery({
               : "Ready to discover"}
           </h2>
           <p>
-            Index your saved files in Data Lake, then run LOKI here. Existing
-            evidence is hidden when its source snapshot becomes stale.
+            Update the index in Data Lake, then run LOKI here. Unchanged contexts
+            are reused; affected contexts are rescored. Earlier integration runs
+            and their saved evidence remain available in Integration.
           </p>
           <button onClick={onIntake}>Go to Data Lake</button>
         </div>

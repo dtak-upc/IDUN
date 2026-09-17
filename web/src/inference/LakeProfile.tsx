@@ -1,5 +1,5 @@
 import { savedDemo } from "../mode";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, post } from "../storage/api";
 import "./profiling.css";
 type Source = {
@@ -71,6 +71,7 @@ type Report = {
   method?: string;
 };
 export function LakeProfile() {
+  const epoch=useRef(0);
   const [report, setReport] = useState<Report>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -78,17 +79,21 @@ export function LakeProfile() {
   const [page, setPage] = useState(0);
   useEffect(() => {
     let active = true;
+    const controller=new AbortController();
     let lastRevision: string | undefined;
+    let timer: ReturnType<typeof setTimeout>;
     async function refresh() {
+      const stamp=epoch.current;
       try {
-        const state = await api<Report>("/profile/status");
+        const state = await api<Report>("/profile/status",{signal:controller.signal});
         if (state.status === "ready" && state.revision !== lastRevision) {
-          const r = await api<Report>("/profile");
-          if (active) {
+          const r = await api<Report>("/profile",{signal:controller.signal});
+          if (active && stamp===epoch.current) {
+            setError("");
             setReport({ ...r, job: state.job });
             lastRevision = state.revision;
           }
-        } else if (active) {
+        } else if (active && stamp===epoch.current) {
           setReport((previous) =>
             state.status === "ready" ? { ...previous, ...state } : state,
           );
@@ -96,16 +101,16 @@ export function LakeProfile() {
         }
       } catch (e) {
         if (active) setError(String(e));
-      }
+      } finally {if(active) timer=setTimeout(refresh,2000);}
     }
     void refresh();
-    const timer = setInterval(refresh, 5000);
     return () => {
       active = false;
-      clearInterval(timer);
+      clearTimeout(timer);controller.abort();
     };
   }, []);
   async function run() {
+    epoch.current++;
     setBusy(true);
     setError("");
     try {
@@ -146,7 +151,7 @@ export function LakeProfile() {
           </p>
         </div>
         <button onClick={run} disabled={running || savedDemo}>
-          {running ? "Updating index…" : "Profile saved lake"}
+          {running ? "Updating index…" : report?.status === "stale" ? "Update lake index" : "Profile saved lake"}
         </button>
       </header>
       {error && <p role="alert">{error}</p>}
@@ -191,8 +196,8 @@ export function LakeProfile() {
       )}
       {report?.status === "stale" && (
         <p role="status">
-          The lake has changed. Profile again to refresh its overview and
-          candidates.
+          Files have changed. Update the index to reuse unchanged embeddings and
+          connect new files with existing sources.
         </p>
       )}
       {report?.status === "ready" && (

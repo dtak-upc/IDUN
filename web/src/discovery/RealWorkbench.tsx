@@ -52,18 +52,16 @@ function useResource<T>(url?: string) {
     error?: string;
   }>();
   useEffect(() => {
-    let active = true;
-    if (url)
-      void api<T>(url)
-        .then((value) => {
-          if (active) setLoaded({ url, value });
-        })
-        .catch((e) => {
-          if (active) setLoaded({ url, error: String(e) });
-        });
-    return () => {
-      active = false;
-    };
+    let active=true;
+    let timer: ReturnType<typeof setTimeout>;
+    const controller=new AbortController();
+    async function load(){
+      if(!url)return;
+      try {const value=await api<T>(url,{signal:controller.signal});if(active)setLoaded({url,value});}
+      catch(e){if(active){setLoaded({url,error:String(e)});timer=setTimeout(load,1500);}}
+    }
+    void load();
+    return ()=>{active=false;clearTimeout(timer);controller.abort();};
   }, [url]);
   return loaded?.url === url ? loaded : undefined;
 }
@@ -79,32 +77,21 @@ export function RealWorkbench({
   const [snapshot, setSnapshot] = useState<Snapshot>();
   const [statusError, setStatusError] = useState("");
   useEffect(() => {
-    let active = true;
-    const refresh = () =>
-      void api<Snapshot>("/discovery")
-        .then((s) => {
-          if (active) {
-            setSnapshot(s);
-            setStatusError("");
-          }
-        })
-        .catch((e) => {
-          if (active) {
-            setSnapshot(undefined);
-            setStatusError(String(e));
-          }
-        });
-    refresh();
-    const timer = setInterval(refresh, 2000);
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
+    let active=true;
+    const controller=new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    async function refresh(){
+      try {const s=await api<Snapshot>("/discovery",{signal:controller.signal});if(active){setSnapshot(s);setStatusError("");}}
+      catch(e){if(active)setStatusError(String(e));}
+      finally{if(active)timer=setTimeout(refresh,2000);}
+    }
+    void refresh();
+    return ()=>{active=false;clearTimeout(timer);controller.abort();};
   }, []);
   const revision = snapshot?.status === "ready" ? snapshot.revision : undefined;
   const seed = useResource<Link>(
-    revision && linkId
-      ? `/discovery/links/${linkId}?revision=${revision}`
+    linkId
+      ? `/discovery/links/${linkId}?revision=${revision || "historical"}`
       : undefined,
   );
   const [chosenSource, setChosenSource] = useState("");
@@ -143,14 +130,15 @@ export function RealWorkbench({
       : seedMatches && offset === 0
         ? seed?.value?.id
         : page?.value?.items[0]?.id;
-  const companion = selected === linkId ? companionId : undefined;
+  const evidenceId=selected || (!revision ? linkId : undefined);
+  const companion = evidenceId === linkId ? companionId : undefined;
   const context = useResource<Context>(
-    revision && selected
-      ? `/discovery/evidence/${selected}?revision=${revision}${companion ? `&companion=${companion}` : ""}`
+    evidenceId
+      ? `/discovery/evidence/${evidenceId}?revision=${revision || "historical"}${companion ? `&companion=${companion}` : ""}`
       : undefined,
   );
   const detail =
-    revision && context?.value?.revision === revision ? context.value : undefined;
+    context?.value && ((!revision && linkId) || context.value.revision === revision) ? context.value : undefined;
   const panels = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (detail) {
@@ -188,7 +176,7 @@ export function RealWorkbench({
         follow a row into the highlighted text.
       </p>
       {error && <p role="alert">{error}</p>}
-      {!revision ? (
+      {!revision && !detail ? (
         <p role="status">
           {snapshot?.status === "stale"
             ? "The lake has changed. Refresh indexing and discovery before inspecting evidence."
@@ -196,6 +184,8 @@ export function RealWorkbench({
         </p>
       ) : (
         <>
+          {!revision && <p>Saved evidence from an earlier integration run. Update discovery to browse current candidates.</p>}
+          {revision && <>
           <div className="rw-controls">
             <label>
               Source table or document
@@ -338,6 +328,7 @@ export function RealWorkbench({
               </button>
             </div>
           </div>
+          </>}
           {candidate && !detail && !context?.error && (
             <p role="status">Loading source rows and text…</p>
           )}

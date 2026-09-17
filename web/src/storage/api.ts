@@ -1,3 +1,9 @@
+let activeLake = "";
+export function selectApiLake(id: string) { activeLake = id; }
+export function apiUrl(path: string, lake = activeLake) {
+  const global = /^\/(settings|health|lakes)(?:\/|$)/.test(path);
+  return "/api/v1" + (lake && !global ? `/lakes/${encodeURIComponent(lake)}` : "") + path;
+}
 export type Job = {
   id: string;
   asset_id: string;
@@ -12,7 +18,7 @@ export type Job = {
   encoding: string;
   dataset_id: string;
 };
-export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+export async function api<T>(path: string, init?: RequestInit, lake = activeLake): Promise<T> {
   if (
     document
       .querySelector('meta[name="idun-mode"]')
@@ -26,7 +32,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   }
   let response: Response;
   try {
-    response = await fetch("/api/v1" + path, init);
+    response = await fetch(apiUrl(path, lake), init);
   } catch {
     throw Error(
       "Local storage is unavailable. Start the Python API with npm run api.",
@@ -56,14 +62,17 @@ export async function ingest(
   signal: AbortSignal,
   progress: (n: number) => void,
 ) {
+  const lake = activeLake;
+  const read = <T>(path: string) => api<T>(path, undefined, lake);
+  const send = <T>(path: string, data: unknown = {}) => api<T>(path, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data)}, lake);
   const cancelled = () => new DOMException("Cancelled", "AbortError");
   const cancel = () => {
-    void post("/jobs/" + id + "/cancel").catch(() => {});
+    void send("/jobs/" + id + "/cancel").catch(() => {});
   };
   if (signal.aborted) throw cancelled();
   signal.addEventListener("abort", cancel, { once: true });
   try {
-    let job = await post<Job>("/jobs", {
+    let job = await send<Job>("/jobs", {
       id,
       name: file.name,
       path,
@@ -77,7 +86,7 @@ export async function ingest(
       throw cancelled();
     }
     if (["failed", "cancelled", "interrupted"].includes(job.status))
-      job = await post<Job>("/jobs/" + id + "/retry", { encoding });
+      job = await send<Job>("/jobs/" + id + "/retry", { encoding });
     if (job.status === "awaiting_upload") {
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -86,7 +95,7 @@ export async function ingest(
           reject(cancelled());
         };
         const cleanup = () => signal.removeEventListener("abort", abort);
-        xhr.open("PUT", "/api/v1/jobs/" + id + "/raw");
+        xhr.open("PUT", apiUrl("/jobs/" + id + "/raw", lake));
         xhr.setRequestHeader("Content-Type", "application/octet-stream");
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable)
@@ -117,7 +126,7 @@ export async function ingest(
     }
     while (true) {
       if (signal.aborted) throw cancelled();
-      job = await api<Job>("/jobs/" + id);
+      job = await read<Job>("/jobs/" + id);
       if (job.status === "ready") {
         progress(100);
         return job;

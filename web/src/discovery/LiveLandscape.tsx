@@ -38,19 +38,19 @@ export function LiveLandscape({
   const [member, setMember] = useState("");
   const [view, setView] = useState<"landscape" | "unlinked">("landscape");
   useEffect(() => {
-    let active = true;
-    setData(undefined);
-    setError("");
-    api<Landscape>("/discovery/landscape")
-      .then((r) => {
-        if (active) setData(r);
-      })
-      .catch((e) => {
-        if (active) setError(String(e));
-      });
-    return () => {
-      active = false;
-    };
+    let active=true;
+    let timer: ReturnType<typeof setTimeout>;
+    const controller=new AbortController();
+    setData(undefined);setError("");
+    async function load(){
+      try {
+        const r=await api<Landscape>("/discovery/landscape",{signal:controller.signal});
+        if(r.revision!==revision) throw Error('Discovery changed; refreshing connections…');
+        if(active){setData(r);setError("");}
+      }catch(e){if(active){setError(String(e));timer=setTimeout(load,1500);}}
+    }
+    void load();
+    return ()=>{active=false;clearTimeout(timer);controller.abort();};
   }, [revision]);
   const current = data?.revision === revision ? data : undefined;
   const group =

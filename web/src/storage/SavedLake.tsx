@@ -1,3 +1,4 @@
+import { apiUrl } from "./api";
 import { savedDemo } from "../mode";
 import { ModelInputPreview } from "../inference/Readiness";
 import { useEffect, useState } from "react";
@@ -373,7 +374,7 @@ export function SavedLake({ onCount }: { onCount: (count: number) => void }) {
                   <div className="saved-preview-heading">
                     <h3>{selected.name}</h3>
                     {!savedDemo && <a
-                      href={`/api/v1/assets/${selected.asset_id}/raw`}
+                      href={apiUrl(`/assets/${selected.asset_id}/raw`)}
                       download
                     >
                       Download original bytes

@@ -1,3 +1,4 @@
+import { apiUrl } from "../storage/api";
 import { useState } from "react";
 export type SemanticPlan = {
   id: string;
@@ -9,6 +10,9 @@ export type SemanticPlan = {
   scope: string;
   counts: { include: number; abstain: number; conflict: number };
   coverage: {
+    retained_pairs?: number;
+    updated_pairs?: number;
+    pending_pairs?: number;
     reviewed: number;
     available_pairs: number;
     pool_pairs: number;
@@ -77,15 +81,53 @@ type JoinedRow = {
   left_link: string;
   right_link: string;
 };
+export type DiffStatus = "added" | "changed" | "withdrawn" | "unchanged";
+
+export type DiffRow = JoinedRow & {
+  diff_status?: DiffStatus;
+  diff_notes?: string;
+  previous_relation?: string;
+  previous_relations?: string[];
+  current_relations?: string[];
+  previous_evidence_count?: number;
+};
+
+export type DiffData = {
+  has_previous: boolean;
+  current: {
+    id: string;
+    title: string;
+    created: number;
+    model?: string;
+  };
+  previous: {
+    id: string;
+    title: string;
+    created: number;
+    model?: string;
+  } | null;
+  counts: {
+    added: number;
+    changed: number;
+    withdrawn: number;
+    unchanged: number;
+    total_current: number;
+    total_previous: number;
+  };
+  rows: DiffRow[];
+};
+
 const label = (s: string) => s.replaceAll("_", " ").toLowerCase();
 export function SemanticResults({
   plan,
+  diff,
   busy,
   onMaterialize,
   onEvidence,
   csvHref,
 }: {
   plan: SemanticPlan;
+  diff?: DiffData;
   busy: boolean;
   onMaterialize: () => void;
   onEvidence: (l: string, r: string) => void;
@@ -95,7 +137,15 @@ export function SemanticResults({
   const [relation, setRelation] = useState("all");
   const [allFields, setAllFields] = useState(false);
   const [focus, setFocus] = useState("");
-  const relations = [...new Set(plan.output.map((r) => r.relation))];
+  const [diffMode, setDiffMode] = useState(false);
+  const [diffFilter, setDiffFilter] = useState<"all" | DiffStatus>("all");
+
+  const activeRows: DiffRow[] =
+    diffMode && diff?.has_previous
+      ? diff.rows.filter((r) => diffFilter === "all" || r.diff_status === diffFilter)
+      : plan.output;
+
+  const relations = [...new Set(activeRows.map((r) => r.relation))];
   const cols = (rows: JoinedRow[], side: "left" | "right") =>
     Array.from(
       new Map(
@@ -130,6 +180,7 @@ export function SemanticResults({
         <p>{plan.description}</p>
         <small>
           {plan.model} · {plan.seconds.toFixed(1)} seconds ·{" "}
+          {plan.coverage.retained_pairs !== undefined && <span>{plan.coverage.retained_pairs} reused · {plan.coverage.updated_pairs} updated · {plan.coverage.pending_pairs} pending. </span>}
           {plan.coverage.reviewed} of {plan.coverage.available_pairs} row pairs
           reviewed
         </small>
@@ -211,9 +262,32 @@ export function SemanticResults({
         >
           Review every decision
         </button>
+        {diff?.has_previous && (
+          <button
+            type="button"
+            className={`diff-toggle-btn ${diffMode ? "active" : ""}`}
+            aria-pressed={diffMode}
+            onClick={() => {
+              setDiffMode(!diffMode);
+              setDiffFilter("all");
+            }}
+            title="Compare with immediately preceding run"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M16 3h5v5" />
+              <path d="M8 21H3v-5" />
+              <path d="M21 3l-7 7" />
+              <path d="M3 21l7-7" />
+            </svg>
+            <span>{diffMode ? "Exit comparison" : "Compare with previous run"}</span>
+            <span className="diff-chip-count">
+              +{diff.counts.added} · Δ{diff.counts.changed} · -{diff.counts.withdrawn}
+            </span>
+          </button>
+        )}
         {plan.materialized ? (
           <a
-            href={csvHref ? csvHref() : `/api/v1/integration/${plan.id}/csv`}
+            href={csvHref ? csvHref() : apiUrl(`/integration/${plan.id}/csv`)}
             download
           >
             Download joined CSV ↓
@@ -228,6 +302,63 @@ export function SemanticResults({
           </button>
         )}
       </div>
+
+      {diffMode && diff?.has_previous && (
+        <div className="diff-banner" role="region" aria-label="Run comparison info">
+          <div className="diff-banner-info">
+            <span className="diff-banner-badge">BEFORE / AFTER COMPARISON</span>
+            <div className="diff-banner-titles">
+              <span className="diff-target-label">
+                Current: <strong>{diff.current.title}</strong> (<code>{diff.current.id.slice(0, 8)}</code>)
+              </span>
+              <span className="diff-vs-arrow">← comparing against</span>
+              <span className="diff-base-label">
+                Previous: <strong>{diff.previous?.title}</strong> (<code>{diff.previous?.id.slice(0, 8)}</code>
+                {diff.previous?.created ? ` · ${new Date(diff.previous.created * 1000).toLocaleDateString()}` : ""}
+                )
+              </span>
+            </div>
+          </div>
+          <div className="diff-stats-pills" role="toolbar" aria-label="Filter by change type">
+            <button
+              type="button"
+              className={`diff-pill ${diffFilter === "all" ? "active" : ""}`}
+              onClick={() => setDiffFilter("all")}
+            >
+              All comparison rows ({diff.rows.length})
+            </button>
+            <button
+              type="button"
+              className={`diff-pill diff-pill-added ${diffFilter === "added" ? "active" : ""}`}
+              onClick={() => setDiffFilter("added")}
+            >
+              <span className="diff-symbol">+</span> Added ({diff.counts.added})
+            </button>
+            <button
+              type="button"
+              className={`diff-pill diff-pill-changed ${diffFilter === "changed" ? "active" : ""}`}
+              onClick={() => setDiffFilter("changed")}
+            >
+              <span className="diff-symbol">Δ</span> Changed ({diff.counts.changed})
+            </button>
+            <button
+              type="button"
+              className={`diff-pill diff-pill-withdrawn ${diffFilter === "withdrawn" ? "active" : ""}`}
+              onClick={() => setDiffFilter("withdrawn")}
+            >
+              <span className="diff-symbol">-</span> Withdrawn ({diff.counts.withdrawn})
+            </button>
+            <button
+              type="button"
+              className={`diff-pill diff-pill-unchanged ${diffFilter === "unchanged" ? "active" : ""}`}
+              onClick={() => setDiffFilter("unchanged")}
+            >
+              <span className="diff-symbol">=</span> Unchanged ({diff.counts.unchanged})
+            </button>
+          </div>
+        </div>
+      )}
+
       {view === "table" ? (
         <>
           <div
@@ -238,7 +369,7 @@ export function SemanticResults({
               aria-pressed={relation === "all"}
               onClick={() => setRelation("all")}
             >
-              All relationships ({plan.output.length})
+              All relationships ({activeRows.length})
             </button>
             {relations.map((r) => (
               <button
@@ -246,7 +377,7 @@ export function SemanticResults({
                 aria-pressed={relation === r}
                 onClick={() => setRelation(r)}
               >
-                {label(r)} ({plan.output.filter((o) => o.relation === r).length}
+                {label(r)} ({activeRows.filter((o) => o.relation === r).length}
                 )
               </button>
             ))}
@@ -262,7 +393,7 @@ export function SemanticResults({
           {relations
             .filter((r) => relation === "all" || r === relation)
             .map((group) => {
-              const rows = plan.output.filter((r) => r.relation === group);
+              const rows = activeRows.filter((r) => r.relation === group);
               const leftCols = cols(rows, "left"),
                 rightCols = cols(rows, "right");
               return (
@@ -277,6 +408,9 @@ export function SemanticResults({
                       <p>
                         {rows.length} joined rows · Source records and
                         supporting evidence
+                        {diffMode && (
+                          <span> · ({rows.filter((x) => x.diff_status === "added").length} added, {rows.filter((x) => x.diff_status === "changed").length} changed, {rows.filter((x) => x.diff_status === "withdrawn").length} withdrawn)</span>
+                        )}
                       </p>
                     </div>
                     {plan.materialized && (
@@ -284,7 +418,7 @@ export function SemanticResults({
                         href={
                           csvHref
                             ? csvHref(group)
-                            : `/api/v1/integration/${plan.id}/csv?relation=${encodeURIComponent(group)}`
+                            : apiUrl(`/integration/${plan.id}/csv?relation=${encodeURIComponent(group)}`)
                         }
                         download
                       >
@@ -296,7 +430,7 @@ export function SemanticResults({
                     <table aria-label={`${label(group)} joined records`}>
                       <thead>
                         <tr>
-                          <th>Pair</th>
+                          <th>{diffMode ? "Pair / Diff" : "Pair"}</th>
                           {allFields ? (
                             leftCols.map((c, i) => (
                               <th key={i}>Diagnosis · {c.name}</th>
@@ -321,10 +455,23 @@ export function SemanticResults({
                       </thead>
                       <tbody>
                         {rows.map((r) => (
-                          <tr key={`${r.candidate}/${r.relation}`}>
+                          <tr
+                            key={`${r.candidate}/${r.relation}/${r.diff_status || ""}`}
+                            className={`semantic-row ${diffMode && r.diff_status ? `diff-row-${r.diff_status}` : ""}`}
+                          >
                             <td>
-                              {r.candidate}
-                              <small>Cluster {r.cluster}</small>
+                              <div className="pair-cell">
+                                <strong>{r.candidate}</strong>
+                                <small>Cluster {r.cluster}</small>
+                                {diffMode && r.diff_status && (
+                                  <span className={`diff-badge diff-badge-${r.diff_status}`}>
+                                    {r.diff_status === "added" && "+ Added"}
+                                    {r.diff_status === "changed" && "Δ Changed"}
+                                    {r.diff_status === "withdrawn" && "- Withdrawn"}
+                                    {r.diff_status === "unchanged" && "= Unchanged"}
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             {allFields ? (
                               leftCols.map((c, i) => (
@@ -343,6 +490,9 @@ export function SemanticResults({
                               >
                                 {label(r.relation)}
                               </span>
+                              {diffMode && r.diff_notes && (
+                                <small className="diff-row-notes">{r.diff_notes}</small>
+                              )}
                             </td>
                             {allFields ? (
                               rightCols.map((c, i) => (

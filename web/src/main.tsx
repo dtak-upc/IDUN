@@ -1,3 +1,4 @@
+import { LakeSelector, LakeWorkspace, type Lake } from "./storage/LakeWorkspace";
 import { publicFile } from "./showcase/paths";
 import { IntegratedDatasets } from "./integration/IntegratedDatasets";
 import { Settings } from "./settings/Settings";
@@ -97,6 +98,13 @@ function Icon({ name, size = 20 }: { name: string; size?: number }) {
       </>
     ),
     close: <path d="m6 6 12 12M18 6 6 18" />,
+    logout: (
+      <>
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+        <polyline points="16 17 21 12 16 7" />
+        <line x1="21" y1="12" x2="9" y2="12" />
+      </>
+    ),
     leaf: (
       <>
         <path d="M5 20c0-8 9-9 13-16 3 11-2 17-10 13M5 20l9-9" />
@@ -119,7 +127,7 @@ function Icon({ name, size = 20 }: { name: string; size?: number }) {
     </svg>
   );
 }
-function App() {
+function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) => void}) {
   const [liveEvidence, setLiveEvidence] = useState<{
     linkId: string;
     companionId?: string;
@@ -129,6 +137,31 @@ function App() {
   const [savedCount, setSavedCount] = useState(0);
   const [withdrawn, setWithdrawn] = useState<string[]>([]);
   const [history, setHistory] = useState<HistoryEvent[]>([]);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [shuttingDown, setShuttingDown] = useState(false);
+  const [shutdownError, setShutdownError] = useState("");
+  const [isShutDown, setIsShutDown] = useState(false);
+
+  async function handleLogout(force = false) {
+    setShuttingDown(true);
+    setShutdownError("");
+    try {
+      const response = await fetch("/api/v1/session/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to shut down servers");
+      }
+      setShowLogoutModal(false);
+      setIsShutDown(true);
+    } catch (err: any) {
+      setShutdownError(err?.message || String(err));
+      setShuttingDown(false);
+    }
+  }
   function applyWithdrawal(ids: string[]) {
     const restored = withdrawn.filter((id) => !ids.includes(id));
     const removed = ids.filter((id) => !withdrawn.includes(id));
@@ -194,6 +227,30 @@ function App() {
         }
       });
   }
+  if (isShutDown) {
+    return (
+      <div className="shutdown-screen" role="status" aria-live="polite">
+        <div className="shutdown-card">
+          <div className="shutdown-icon">
+            <Icon name="logout" size={36} />
+          </div>
+          <h2>IDUN Has Been Shut Down</h2>
+          <p className="shutdown-lead">
+            All active servers and background terminal processes have stopped cleanly.
+          </p>
+          <div className="shutdown-badge">
+            <span className="shutdown-dot"></span> System Offline
+          </div>
+          <p className="shutdown-instruction">
+            You may now safely close this browser tab.
+          </p>
+          <div className="shutdown-hint">
+            To start IDUN again in the future, run <code>Start_IDUN.bat</code> or <code>npm start</code> in your terminal.
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div
       className={`app studio-app page-${page.toLowerCase().replace(" ", "-")} ${savedCount ? "has-saved" : ""}`}
@@ -212,12 +269,19 @@ function App() {
           aria-label="IDUN home"
         >
           <span className="brand-mark">
-            <img src={publicFile("idun.svg")} width="34" height="34" alt="" />
+            <img src={publicFile("idun.svg")} width="38" height="38" alt="IDUN logo" />
           </span>
-          <span>
-            IDUN
+          <span className="brand-text">
+            <span className="brand-title">IDUN</span>
             <span className="brand-caption">
-              Integrating Data-lake of Unstructured Nature
+              <span className="brand-caption-line">
+                <span className="brand-acronym">I</span>ntegrating{" "}
+                <span className="brand-acronym">D</span>ata-lake of
+              </span>
+              <span className="brand-caption-line">
+                <span className="brand-acronym">U</span>nstructured{" "}
+                <span className="brand-acronym">N</span>ature
+              </span>
             </span>
           </span>
         </a>
@@ -251,6 +315,7 @@ function App() {
             ))}
         </nav>
         <div className="studio-header-actions">
+          {lake && onLakeChange && <LakeSelector lake={lake} onChange={onLakeChange} blocked={queue.some(a => a.transfer !== "uploaded")} />}
           <div className="studio-session">
             <i /> {publicDemo ? "YOUR DEMO WORKSPACE" : "LOCAL WORKSPACE"}{" "}
             <span>LOKI + THOR</span>
@@ -265,6 +330,20 @@ function App() {
             >
               <Icon name="settings" />
               <span>Settings</span>
+            </button>
+          )}
+          {!publicDemo && (
+            <button
+              className="nav-item logout-corner"
+              onClick={() => {
+                setShutdownError("");
+                setShowLogoutModal(true);
+              }}
+              title="Logout & shut down IDUN"
+              aria-label="Logout"
+            >
+              <Icon name="logout" />
+              <span>Logout</span>
             </button>
           )}
         </div>
@@ -287,6 +366,7 @@ function App() {
           {page === "Data Lake" ? (
             <>
               <LakeScene
+                lakeName={lake?.name}
                 count={queue.length}
                 savedCount={savedCount}
                 onExplore={() => {
@@ -301,7 +381,7 @@ function App() {
                 <div className="section-title">
                   <div>
                     <span className="eyebrow">Your starting point</span>
-                    <h3 id="intake-title">Add a raw data lake</h3>
+                    <h3 id="intake-title">{lake ? `Add files to ${lake.name}` : "Add a raw data lake"}</h3>
                   </div>
                   <span className="format-tag">CSV + TXT</span>
                 </div>
@@ -400,7 +480,7 @@ function App() {
                     "Choose files, preview them, then save to your local lake. Index the saved lake, then run LOKI in Discover."}
                 </p>
               </section>
-              {queue.length > 0 && <IntakeReview intake={intake} />}
+              {queue.length > 0 && <IntakeReview intake={intake} lakeName={lake?.name} />}
               <SavedLake onCount={setSavedCount} />
               <LakeProfile />
               {!savedDemo && <InferenceReadiness />}
@@ -478,11 +558,72 @@ function App() {
           </footer>
         </main>
       </div>
+      {showLogoutModal && (
+        <div
+          className="logout-modal-backdrop"
+          onClick={() => !shuttingDown && setShowLogoutModal(false)}
+        >
+          <div
+            className="logout-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="logout-dialog-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="logout-modal-header">
+              <div className="logout-modal-icon">
+                <Icon name="logout" size={22} />
+              </div>
+              <h3 id="logout-dialog-title">Log out & Shut Down IDUN?</h3>
+            </div>
+            <div className="logout-modal-body">
+              <p>Logging out will stop all local services:</p>
+              <ul className="logout-impact-list">
+                <li>Stops the Python API server</li>
+                <li>Stops the Vite web server</li>
+                <li>Closes the background node/npm process and terminal window</li>
+                <li>Unloads any active AI models from GPU VRAM</li>
+              </ul>
+              {shutdownError && (
+                <div className="logout-error" role="alert">
+                  <p>{shutdownError}</p>
+                  <button
+                    type="button"
+                    className="logout-force-btn"
+                    onClick={() => handleLogout(true)}
+                    disabled={shuttingDown}
+                  >
+                    Force Shut Down Anyway
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="logout-modal-actions">
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={() => setShowLogoutModal(false)}
+                disabled={shuttingDown}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-danger-logout"
+                onClick={() => handleLogout(false)}
+                disabled={shuttingDown}
+              >
+                {shuttingDown ? "Shutting down…" : "Log out & Shut Down"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <LakeWorkspace>{(lake, onChange) => <App key={lake?.id || "public"} lake={lake} onLakeChange={onChange} />}</LakeWorkspace>
   </React.StrictMode>,
 );

@@ -1,9 +1,11 @@
 import { savedDemo } from "../mode";
 export function LakeScene({
+  lakeName,
   count,
   savedCount = 0,
   onExplore,
 }: {
+  lakeName?: string;
   count: number;
   savedCount?: number;
   onExplore: () => void;
@@ -12,7 +14,7 @@ export function LakeScene({
     <section className="lake-scene" aria-label="Data lake overview">
       <div className="lake-overview-title">
         <div>
-          <h2>Your data lake</h2>
+          <h2>{lakeName || "Your data lake"}</h2>
           <p>
             {count
               ? `${count} staged files. Preview and save them below.`
@@ -42,8 +44,8 @@ export function LakeScene({
         </li>
       </ol>
       <div className="example-entry">
-        <span>Discovery is not connected yet.</span>
-        <button onClick={onExplore}>Explore the interface example ↗</button>
+        <span>Explore the sources and connections in this lake.</span>
+        <button onClick={onExplore}>Explore discovery ↗</button>
       </div>
     </section>
   );

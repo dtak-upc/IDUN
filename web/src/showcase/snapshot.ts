@@ -61,8 +61,79 @@ export async function savedApi<T>(path: string): Promise<T> {
     result = {total:s.assets.length, matched:assets.length, offset, assets:assets.slice(offset, offset+25)};
   } else if (url.pathname === "/integration") {
     result = {discovery_ready:true, plans:[{...s.plan, stale:false}]};
-  } else if (url.pathname === `/integration/${s.plan.id}`) result = s.plan;
-  else if (url.pathname === "/discovery/links" || url.pathname === "/discovery/bridges") {
+  } else if (url.pathname === `/integration/${s.plan.id}`) {
+    result = s.plan;
+  } else if (url.pathname === "/lakes") {
+    result = {
+      lakes: [{ id: "demo", name: "Demo", files: s.assets.length }],
+      default_id: "demo",
+    };
+  } else if (url.pathname === "/settings/hf/loaded") {
+    result = { loaded: false, repo_id: "", vram_mb: 0 };
+  } else if (url.pathname.endsWith("/diff")) {
+    result = {
+      baseline_id: "",
+      current_id: id,
+      added: [],
+      removed: [],
+      unchanged: s.plan.output.length,
+    };
+  } else if (url.pathname === "/integration/schema/defaults") {
+    result = {
+      modes: ["strict", "hybrid", "open"],
+      default_mode: "strict",
+      defaults: [
+        { label: "TREATS", definition: "Medication prescribed, started or continued to manage diagnosis.", enabled: true },
+        { label: "ADVERSE_EFFECT", definition: "Medication caused, worsened or suspected to cause symptom.", enabled: true },
+        { label: "DISCONTINUED", definition: "Medication stopped, held or switched away from.", enabled: true },
+        { label: "CONTRAINDICATED", definition: "Medication unsafe/inappropriate for this diagnosis/context.", enabled: true },
+        { label: "NEGATIVE", definition: "Evidence indicates medication is for a different diagnosis.", enabled: true },
+        { label: "UNRESOLVED", definition: "Insufficient evidence in narrative to determine relationship.", enabled: true },
+      ],
+    };
+  } else if (url.pathname === "/integration/schema/probe") {
+    result = {
+      probed_count: 4,
+      available_pairs: 12,
+      defaults: [
+        { label: "TREATS", definition: "Medication prescribed, started or continued to manage diagnosis.", enabled: true },
+        { label: "ADVERSE_EFFECT", definition: "Medication caused, worsened or suspected to cause symptom.", enabled: true },
+        { label: "DISCONTINUED", definition: "Medication stopped, held or switched away from.", enabled: true },
+        { label: "CONTRAINDICATED", definition: "Medication unsafe/inappropriate for this diagnosis/context.", enabled: true },
+        { label: "NEGATIVE", definition: "Evidence indicates medication is for a different diagnosis.", enabled: true },
+        { label: "UNRESOLVED", definition: "Insufficient evidence in narrative to determine relationship.", enabled: true },
+      ],
+      suggestions: [
+        {
+          label: "TREATS",
+          definition: "Medication prescribed, started or continued to manage diagnosis.",
+          occurrences: 3,
+          is_default: true,
+          sample_quotes: [
+            { diagnosis: "Hypertension", medication: "Lisinopril", quote: "Initiated lisinopril 10 mg daily for blood pressure control." },
+          ],
+        },
+        {
+          label: "ADVERSE_EFFECT",
+          definition: "Medication caused, worsened or suspected to cause symptom.",
+          occurrences: 2,
+          is_default: true,
+          sample_quotes: [
+            { diagnosis: "Dry cough", medication: "Lisinopril", quote: "Patient developed persistent non-productive dry cough after starting ACE inhibitor." },
+          ],
+        },
+        {
+          label: "DISCONTINUED",
+          definition: "Medication stopped, held or switched away from.",
+          occurrences: 4,
+          is_default: true,
+          sample_quotes: [
+            { diagnosis: "Cough", medication: "Lisinopril", quote: "Discontinued lisinopril due to intolerable cough." },
+          ],
+        },
+      ],
+    };
+  } else if (url.pathname === "/discovery/links" || url.pathname === "/discovery/bridges") {
     const links = url.pathname.endsWith("/links") ? s.links.filter(l => !source || l.table === source || l.text === source) : s.bridges;
     result = {total:links.length, offset, items:links.slice(offset, offset+20)};
   } else if (s.routes[url.pathname]) {

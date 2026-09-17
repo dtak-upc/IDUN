@@ -31,29 +31,70 @@ body {
   overflow: visible;
 }
 .studio-app .brand {
-  color: #243147;
-  font-size: 25px;
-  flex: 0 0 220px;
-  gap: 9px;
+  color: #0f172a;
+  flex: 0 0 auto;
+  display: flex;
   align-items: center;
+  gap: 12px;
   line-height: 1;
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+  user-select: none;
+}
+.studio-app .brand:hover {
+  opacity: 0.92;
 }
 .studio-app .brand-mark {
-  background: none;
-  width: 30px;
-  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
   margin: 0;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 7px rgba(29, 78, 216, 0.24));
+  transition: transform 0.18s ease;
 }
+.studio-app .brand:hover .brand-mark {
+  transform: scale(1.04);
+}
+.studio-app .brand-mark img,
 .studio-app .brand-mark svg {
-  width: 28px;
-  height: 28px;
+  width: 40px;
+  height: 40px;
+  display: block;
+}
+.studio-app .brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.studio-app .brand-title {
+  font-size: 26px;
+  font-weight: 850;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  background: linear-gradient(135deg, #0f172a 0%, #1e40af 60%, #2563eb 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 .studio-app .brand-caption {
-  font-size: 10px;
-  color: #68768a;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #475569;
   line-height: 1.25;
-  margin-top: 4px;
-  max-width: 180px;
+  letter-spacing: -0.005em;
+}
+.studio-app .brand-caption-line {
+  white-space: nowrap;
+}
+.studio-app .brand-acronym {
+  font-weight: 800;
+  color: #1d4ed8;
+  letter-spacing: 0.01em;
 }
 .studio-app .sidebar nav {
   display: flex;
@@ -823,17 +864,20 @@ body {
   }
   .studio-app .sidebar {
     justify-content: space-between;
-    padding-inline: 18px;
-    gap: 12px;
+    padding-inline: 12px;
+    gap: 8px;
   }
   .studio-app .brand {
-    flex-basis: 190px;
+    flex-basis: auto;
+    gap: 8px;
   }
   .studio-app main {
-    padding: 16px 18px 0;
+    padding: 16px 14px 0;
   }
   .studio-app .nav-item {
-    padding: 8px 10px;
+    padding: 7px 8px;
+    font-size: 13px;
+    gap: 5px;
   }
 }
 @media (max-width: 760px) {
@@ -1037,3 +1081,236 @@ body {
 .studio-app .settings-corner{display:flex;align-items:center}
 @media(max-width:1100px){.studio-app .settings-corner{padding:8px}.settings-corner>span{display:none}}
 @media(max-width:760px){.studio-header-actions{position:absolute;right:12px;top:14px}.studio-app .brand{padding-inline:35px}.studio-app .settings-corner{background:#f5f7fb}}
+
+/* Logout Button & Shutdown UI */
+.studio-app .logout-corner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #c53030;
+  border-radius: 6px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.studio-app .logout-corner:hover {
+  background: rgba(229, 62, 62, 0.08);
+  color: #9b2c2c;
+}
+@media (max-width: 1100px) {
+  .studio-app .logout-corner {
+    padding: 8px;
+  }
+  .logout-corner > span {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .studio-app .logout-corner {
+    background: #fff5f5;
+  }
+}
+
+/* Logout Modal */
+.logout-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.15s ease-out;
+}
+.logout-modal {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.05);
+  max-width: 460px;
+  width: 90%;
+  padding: 24px;
+  box-sizing: border-box;
+}
+.logout-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.logout-modal-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #fee2e2;
+  color: #dc2626;
+  flex-shrink: 0;
+}
+.logout-modal-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+.logout-modal-body p {
+  margin: 0 0 12px;
+  color: #475569;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.logout-impact-list {
+  margin: 0 0 18px;
+  padding-left: 20px;
+  color: #64748b;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+.logout-impact-list li {
+  margin-bottom: 4px;
+}
+.logout-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+  color: #b91c1c;
+  font-size: 0.88rem;
+}
+.logout-error p {
+  margin: 0 0 8px;
+  color: #b91c1c;
+}
+.logout-force-btn {
+  background: #dc2626;
+  color: #ffffff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.logout-force-btn:hover {
+  background: #b91c1c;
+}
+.logout-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+.logout-modal-actions button {
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s ease;
+}
+.logout-modal-actions .btn-cancel {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #e2e8f0;
+}
+.logout-modal-actions .btn-cancel:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+.logout-modal-actions .btn-danger-logout {
+  background: #dc2626;
+  color: #ffffff;
+}
+.logout-modal-actions .btn-danger-logout:hover:not(:disabled) {
+  background: #b91c1c;
+}
+.logout-modal-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Shutdown Screen */
+.shutdown-screen {
+  position: fixed;
+  inset: 0;
+  background: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 99999;
+}
+.shutdown-card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  max-width: 520px;
+  width: 100%;
+  padding: 40px 32px;
+  text-align: center;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  animation: fadeIn 0.3s ease-out;
+}
+.shutdown-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  margin-bottom: 24px;
+}
+.shutdown-card h2 {
+  color: #f8fafc;
+  font-size: 1.6rem;
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+.shutdown-lead {
+  color: #94a3b8;
+  font-size: 1rem;
+  margin: 0 0 20px;
+  line-height: 1.6;
+}
+.shutdown-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #fca5a5;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 24px;
+}
+.shutdown-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+}
+.shutdown-instruction {
+  color: #cbd5e1;
+  font-size: 1.05rem;
+  font-weight: 500;
+  margin: 0 0 20px;
+}
+.shutdown-hint {
+  color: #64748b;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  border-top: 1px solid #334155;
+  padding-top: 20px;
+}
+.shutdown-hint code {
+  background: #0f172a;
+  color: #38bdf8;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+

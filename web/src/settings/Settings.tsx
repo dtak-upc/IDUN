@@ -15,6 +15,7 @@ type Config = {
     max_output_tokens: number;
     temperature: number | null;
     top_p: number | null;
+    auto_unload?: boolean;
   };
 };
 type Info = {
@@ -49,6 +50,38 @@ type Probe = {
   loki_dependencies_present: boolean;
   torch_error?: string;
 };
+
+type HFModel = {
+  repo_id: string;
+  name: string;
+  params: string;
+  vram_estimate: string;
+  gated: boolean;
+  recommended: boolean;
+  description: string;
+  downloaded: boolean;
+  loaded?: boolean;
+  size_str: string;
+  size_on_disk: number;
+  format?: string;
+  compatible?: boolean;
+};
+
+type HFLoadedInfo = {
+  loaded: boolean;
+  repo_id: string;
+  vram_mb: number;
+};
+
+type HFDownloadStatus = {
+  status: "idle" | "downloading" | "completed" | "error";
+  repo_id: string;
+  message: string;
+  percent: number;
+  error: string;
+  started_at?: number;
+};
+
 export function Settings() {
   const [info, setInfo] = useState<Info>();
   const [draft, setDraft] = useState<Config>();
@@ -57,6 +90,23 @@ export function Settings() {
   const [notice, setNotice] = useState("");
   const [probe, setProbe] = useState<Probe>();
   const [models, setModels] = useState<string[]>([]);
+  const [hfModels, setHfModels] = useState<HFModel[]>([]);
+  const [hfLoaded, setHfLoaded] = useState<HFLoadedInfo>({
+    loaded: false,
+    repo_id: "",
+    vram_mb: 0,
+  });
+  const [hfUnloading, setHfUnloading] = useState(false);
+  const [hfStatus, setHfStatus] = useState<HFDownloadStatus>({
+    status: "idle",
+    repo_id: "",
+    message: "",
+    percent: 0,
+    error: "",
+  });
+  const [customRepo, setCustomRepo] = useState("");
+  const [hfLoading, setHfLoading] = useState(false);
+
   useEffect(() => {
     let active = true;
     api<Info>("/settings")
@@ -73,6 +123,120 @@ export function Settings() {
       active = false;
     };
   }, []);
+
+  const fetchHfModels = async () => {
+    try {
+      setHfLoading(true);
+      const res = await api<{ models: HFModel[]; loaded?: HFLoadedInfo }>("/settings/hf/models");
+      setHfModels(res.models || []);
+      if (res.loaded) {
+        setHfLoaded(res.loaded);
+      }
+    } catch (e) {
+      console.error("Failed to load Hugging Face models:", e);
+    } finally {
+      setHfLoading(false);
+    }
+  };
+
+  const handleUnloadModel = async () => {
+    try {
+      setHfUnloading(true);
+      setError("");
+      const res = await post<{ unloaded: boolean; repo_id: string }>("/settings/hf/unload");
+      setHfLoaded({ loaded: false, repo_id: "", vram_mb: 0 });
+      setNotice(
+        res.unloaded
+          ? `Model ${res.repo_id || ""} was successfully unloaded from VRAM. GPU memory released.`
+          : "No model was currently loaded in VRAM."
+      );
+      await fetchHfModels();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setHfUnloading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (draft?.llm.provider === "huggingface") {
+      fetchHfModels();
+    }
+  }, [draft?.llm.provider]);
+
+  useEffect(() => {
+    let timer: number | null = null;
+    if (hfStatus.status === "downloading") {
+      timer = window.setInterval(async () => {
+        try {
+          const s = await api<HFDownloadStatus>("/settings/hf/download/status");
+          setHfStatus(s);
+          if (s.status === "completed") {
+            setNotice(s.message || `Model ${s.repo_id} downloaded successfully.`);
+            fetchHfModels();
+            if (draft && (!draft.llm.model || draft.llm.model === s.repo_id)) {
+              change("llm", { ...draft.llm, model: s.repo_id });
+            }
+          } else if (s.status === "error") {
+            setError(s.error || "Download failed.");
+          }
+        } catch {
+          // ignore transient poll error
+        }
+      }, 1200);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [hfStatus.status, draft]);
+
+  const handleStartDownload = async (repoId: string) => {
+    if (!repoId.trim()) return;
+    setError("");
+    setNotice("");
+    try {
+      await post("/settings/hf/download", {
+        repo_id: repoId.trim(),
+        key_env: draft?.llm.key_env || "",
+      });
+      setHfStatus({
+        status: "downloading",
+        repo_id: repoId.trim(),
+        message: `Connecting to Hugging Face for ${repoId.trim()}...`,
+        percent: 10,
+        error: "",
+      });
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const handleCancelDownload = async () => {
+    try {
+      await post("/settings/hf/download/cancel");
+      setHfStatus({
+        status: "idle",
+        repo_id: "",
+        message: "Download cancelled",
+        percent: 0,
+        error: "",
+      });
+      await fetchHfModels();
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const handleDeleteModel = async (repoId: string) => {
+    if (!window.confirm(`Delete local cached files for ${repoId}?`)) return;
+    try {
+      await post("/settings/hf/delete", { repo_id: repoId });
+      setNotice(`Deleted local cache for ${repoId}`);
+      await fetchHfModels();
+    } catch (e) {
+      setError(String(e));
+    }
+  };
   async function action(label: string, fn: () => Promise<void>) {
     setBusy(label);
     setError("");
@@ -126,7 +290,7 @@ export function Settings() {
     setNotice("");
     if (key === "model_python") setProbe(undefined);
   }
-  function llm(key: keyof Config["llm"], value: string | number | null) {
+  function llm(key: keyof Config["llm"], value: string | number | null | boolean) {
     if (draft) change("llm", { ...draft.llm, [key]: value });
     if (key !== "model") setModels([]);
   }
@@ -384,19 +548,24 @@ export function Settings() {
                     aria-label="LLM provider"
                     value={draft.llm.provider}
                     onChange={(e) => {
+                      const p = e.target.value;
                       change("llm", {
                         ...draft.llm,
-                        provider: e.target.value,
+                        provider: p,
                         base_url:
-                          e.target.value === "ollama"
+                          p === "ollama"
                             ? "http://127.0.0.1:11434"
-                            : e.target.value === "lm-studio"
+                            : p === "lm-studio"
                               ? "http://127.0.0.1:1234/v1"
-                              : e.target.value === "openai-compatible"
-                                ? "https://api.openai.com/v1"
-                                : draft.llm.base_url,
+                              : p === "unsloth"
+                                ? "http://127.0.0.1:8888/v1"
+                                : p === "openai-compatible"
+                                  ? "https://api.openai.com/v1"
+                                  : p === "huggingface"
+                                    ? ""
+                                    : draft.llm.base_url,
                         key_env:
-                          e.target.value === "openai-compatible"
+                          p === "openai-compatible"
                             ? "OPENAI_API_KEY"
                             : "",
                       });
@@ -404,43 +573,290 @@ export function Settings() {
                     }}
                   >
                     <option value="disabled">Not configured</option>
+                    <option value="huggingface">Hugging Face (Direct in-process)</option>
                     <option value="ollama">Ollama</option>
                     <option value="lm-studio">LM Studio · local / LAN</option>
+                    <option value="unsloth">Unsloth LAN</option>
                     <option value="openai-compatible">
                       OpenAI-compatible API / local server
                     </option>
                   </select>
                 </label>
-                <label>
-                  Server base URL
-                  <input
-                    aria-label="LLM base URL"
-                    value={draft.llm.base_url}
-                    onChange={(e) => llm("base_url", e.target.value)}
-                  />
-                </label>
-                <small>
-                  LM Studio and compatible APIs automatically add /v1 to a bare
-                  server URL. Loopback and private LAN IPs support HTTP; public
-                  servers require HTTPS. Ollama uses the server root.
-                </small>
-                <label>
-                  API key environment variable
-                  <input
-                    aria-label="API key environment variable"
-                    autoComplete="off"
-                    value={draft.llm.key_env}
-                    placeholder="e.g. OPENAI_API_KEY · blank for no authentication"
-                    onChange={(e) => llm("key_env", e.target.value)}
-                  />
-                </label>
-                <small>
-                  Enter the variable’s name, not the secret. Set its value in
-                  Windows user environment variables to refresh it without restarting
-                  IDUN. Each connection test and LLM request reads the current value.
-                  Other platforms use the backend process environment. The key stays
-                  on the server and is never returned to the browser.
-                </small>
+
+                {draft.llm.provider === "huggingface" ? (
+                  <div className="hf-section-container">
+                    <div className="hf-info-banner">
+                      <strong>Direct In-Process Hugging Face Runtime</strong>
+                      <p>
+                        Models execute locally inside IDUN using Hugging Face Transformers with PyTorch CUDA acceleration. No external server (LM Studio / Ollama) is required.
+                      </p>
+                    </div>
+
+                    {hfLoaded.loaded && (
+                      <div className="hf-loaded-banner">
+                        <div className="hf-loaded-left">
+                          <span className="hf-loaded-indicator" />
+                          <div>
+                            <strong>Active in VRAM: {hfLoaded.repo_id}</strong>
+                            {hfLoaded.vram_mb > 0 && (
+                              <span className="hf-vram-usage"> (~{hfLoaded.vram_mb} MB VRAM)</span>
+                            )}
+                            <p>Model is resident in memory for immediate inference response.</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="hf-unload-btn"
+                          onClick={handleUnloadModel}
+                          disabled={hfUnloading}
+                        >
+                          {hfUnloading ? "Unloading…" : "Unload from VRAM"}
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="hf-catalog-section">
+                      <div className="hf-catalog-header">
+                        <div>
+                          <h3>Curated Local Models & Disk Cache</h3>
+                          <small>Select a model to use for relationship probing and integration proposals</small>
+                        </div>
+                        <button
+                          type="button"
+                          className="hf-refresh-btn"
+                          onClick={fetchHfModels}
+                          disabled={hfLoading}
+                        >
+                          {hfLoading ? "Refreshing…" : "↻ Refresh Cache"}
+                        </button>
+                      </div>
+
+                      {hfStatus.status === "downloading" && (
+                        <div className="hf-downloading-banner">
+                          <div className="hf-downloading-top">
+                            <strong>
+                              Downloading {hfStatus.repo_id} ({hfStatus.percent}%)
+                            </strong>
+                            <button
+                              type="button"
+                              className="hf-cancel-btn"
+                              onClick={handleCancelDownload}
+                            >
+                              Cancel Download
+                            </button>
+                          </div>
+                          <p>{hfStatus.message}</p>
+                          <div className="hf-progress-bar-wrap">
+                            <div
+                              className="hf-progress-bar-fill"
+                              style={{ width: `${Math.max(5, hfStatus.percent)}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="hf-cards-grid">
+                        {hfModels.map((m) => {
+                          const isSelected = draft.llm.model === m.repo_id;
+                          const isDownloadingThis =
+                            hfStatus.status === "downloading" &&
+                            hfStatus.repo_id === m.repo_id;
+                          const isGguf = m.format === "gguf" || m.compatible === false;
+                          const isLoaded = Boolean(m.loaded || (hfLoaded.loaded && hfLoaded.repo_id === m.repo_id));
+                          return (
+                            <div
+                              key={m.repo_id}
+                              className={`hf-card ${isSelected ? "hf-card-selected" : ""} ${m.downloaded ? "hf-card-ready" : ""}`}
+                            >
+                              <div className="hf-card-top">
+                                <div className="hf-card-title-wrap">
+                                  <h4>{m.name}</h4>
+                                  <span className="hf-repo-id">{m.repo_id}</span>
+                                </div>
+                                <div className="hf-badges">
+                                  {isLoaded && (
+                                    <span className="hf-badge hf-badge-loaded">⚡ In VRAM</span>
+                                  )}
+                                  {m.recommended && (
+                                    <span className="hf-badge hf-badge-rec">★ Recommended</span>
+                                  )}
+                                  {m.gated && (
+                                    <span className="hf-badge hf-badge-gated">🔒 Gated (HF_TOKEN)</span>
+                                  )}
+                                  {isGguf && (
+                                    <span className="hf-badge hf-badge-gated">📦 GGUF format</span>
+                                  )}
+                                  <span className="hf-badge hf-badge-vram">
+                                    {m.params} · {m.vram_estimate}
+                                  </span>
+                                </div>
+                              </div>
+                              <p className="hf-card-desc">{m.description}</p>
+                              <div className="hf-card-footer">
+                                {m.downloaded ? (
+                                  <div className="hf-card-ready-actions">
+                                    <span className={`hf-status-tag ${isGguf ? "not-downloaded" : "ready"}`}>
+                                      {isGguf ? `GGUF in Cache (${m.size_str})` : `✓ Ready in Cache (${m.size_str})`}
+                                    </span>
+                                    <div className="hf-btn-group">
+                                      {isGguf ? (
+                                        <button
+                                          type="button"
+                                          className="hf-select-btn"
+                                          style={{ background: "#d97706" }}
+                                          title="GGUF models run through LM Studio"
+                                          onClick={() => {
+                                            change("llm", {
+                                              ...draft.llm,
+                                              provider: "lm-studio",
+                                              base_url: "http://127.0.0.1:1234/v1",
+                                              model: m.repo_id,
+                                            });
+                                            setNotice(`Switched Provider to LM Studio for GGUF model ${m.repo_id}.`);
+                                          }}
+                                        >
+                                          Use with LM Studio
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          className={`hf-select-btn ${isSelected ? "active" : ""}`}
+                                          onClick={() => llm("model", m.repo_id)}
+                                        >
+                                          {isSelected ? "✓ Active Model" : "Select for Inference"}
+                                        </button>
+                                      )}
+                                      {isLoaded && (
+                                        <button
+                                          type="button"
+                                          className="hf-card-unload-btn"
+                                          title="Release model from VRAM"
+                                          disabled={hfUnloading}
+                                          onClick={handleUnloadModel}
+                                        >
+                                          {hfUnloading ? "Unloading…" : "Unload"}
+                                        </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        className="hf-delete-btn"
+                                        title="Delete model from disk"
+                                        onClick={() => handleDeleteModel(m.repo_id)}
+                                      >
+                                        Delete
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="hf-card-download-actions">
+                                    <span className="hf-status-tag not-downloaded">
+                                      Not cached locally
+                                    </span>
+                                    <button
+                                      type="button"
+                                      className="hf-download-btn"
+                                      disabled={hfStatus.status === "downloading"}
+                                      onClick={() => handleStartDownload(m.repo_id)}
+                                    >
+                                      {isDownloadingThis ? "Downloading…" : "Download"}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="hf-custom-repo-row">
+                        <label>
+                          Download custom Hugging Face repository
+                          <div className="hf-custom-repo-input-group">
+                            <input
+                              type="text"
+                              placeholder="e.g. meta-llama/Llama-3.2-1B-Instruct or any Hugging Face repo ID"
+                              value={customRepo}
+                              onChange={(e) => setCustomRepo(e.target.value)}
+                            />
+                            <button
+                              type="button"
+                              className="hf-custom-dl-btn"
+                              disabled={!customRepo.trim() || hfStatus.status === "downloading"}
+                              onClick={() => {
+                                handleStartDownload(customRepo.trim());
+                                setCustomRepo("");
+                              }}
+                            >
+                              Download Custom Model
+                            </button>
+                          </div>
+                        </label>
+                      </div>
+
+                      <div className="hf-auto-unload-option">
+                        <label className="hf-checkbox-label">
+                          <input
+                            type="checkbox"
+                            checked={draft.llm.auto_unload ?? true}
+                            onChange={(e) => llm("auto_unload", e.target.checked)}
+                          />
+                          <span>Automatically unload model from VRAM after inference</span>
+                        </label>
+                        <small>
+                          Frees GPU/host memory immediately after relationship probing or semantic integration finishes. If unchecked, the model stays resident in VRAM for faster subsequent responses.
+                        </small>
+                      </div>
+                    </div>
+
+                    <label>
+                      Hugging Face token environment variable (optional)
+                      <input
+                        aria-label="Hugging Face token environment variable"
+                        autoComplete="off"
+                        value={draft.llm.key_env}
+                        placeholder="Leave blank for public models · e.g. HF_TOKEN only for gated models"
+                        onChange={(e) => llm("key_env", e.target.value)}
+                      />
+                    </label>
+                    <small>
+                      Gated models require accepting license terms on Hugging Face and entering the environment variable name containing your Hugging Face User Access Token (e.g. HF_TOKEN). Public models (Qwen, Phi) can run with this blank.
+                    </small>
+                  </div>
+                ) : (
+                  <>
+                    <label>
+                      Server base URL
+                      <input
+                        aria-label="LLM base URL"
+                        value={draft.llm.base_url}
+                        onChange={(e) => llm("base_url", e.target.value)}
+                      />
+                    </label>
+                    <small>
+                      LM Studio, Unsloth LAN and compatible APIs automatically add /v1 to a bare
+                      server URL. Loopback and private LAN IPs support HTTP; public
+                      servers require HTTPS. Ollama uses the server root.
+                    </small>
+                    <label>
+                      API key environment variable
+                      <input
+                        aria-label="API key environment variable"
+                        autoComplete="off"
+                        value={draft.llm.key_env}
+                        placeholder="e.g. OPENAI_API_KEY · blank for no authentication"
+                        onChange={(e) => llm("key_env", e.target.value)}
+                      />
+                    </label>
+                    <small>
+                      Enter the variable’s name, not the secret. Set its value in
+                      Windows user environment variables to refresh it without restarting
+                      IDUN. Each connection test and LLM request reads the current value.
+                      Other platforms use the backend process environment. The key stays
+                      on the server and is never returned to the browser.
+                    </small>
+                  </>
+                )}
+
                 <div className="settings-row">
                   <label>
                     Model
@@ -508,12 +924,11 @@ export function Settings() {
                     />
                   </label>
                   <label>
-                    Timeout (seconds)
+                    Timeout (seconds; 0 = no timeout)
                     <input
                       aria-label="LLM timeout"
                       type="number"
-                      min="1"
-                      max="60"
+                      min="0"
                       value={draft.llm.timeout_seconds}
                       onChange={(e) =>
                         llm("timeout_seconds", Number(e.target.value))
@@ -528,17 +943,21 @@ export function Settings() {
                       const r = await post<{
                         models: string[];
                         selected_model_available: boolean;
+                        notice?: string;
                       }>("/settings/llm-test", draft.llm);
                       setModels(r.models);
                       setNotice(
-                        `Connected. ${r.models.length} models listed.${draft.llm.model ? (r.selected_model_available ? " Selected model is listed." : " Selected model was not in this listing.") : ""} No lake data or inference prompt was sent.`,
+                        r.notice ||
+                          `Connected. ${r.models.length} models listed.${draft.llm.model ? (r.selected_model_available ? " Selected model is listed." : " Selected model was not in this listing.") : ""} No lake data or inference prompt was sent.`,
                       );
                     })
                   }
                 >
                   {busy === "Testing LLM"
                     ? "Connecting…"
-                    : "Test connection & list models"}
+                    : draft.llm.provider === "huggingface"
+                      ? "Verify model availability"
+                      : "Test connection & list models"}
                 </button>
                 <p className="settings-connection-note">
                   This configures the connection for the upcoming integration

@@ -6,7 +6,7 @@ const PAGE_SIZE = 25;
 const eligible = (a: Asset) =>
   a.inspection === "ready" &&
   !["queued", "uploading", "uploaded"].includes(a.transfer);
-export function IntakeReview({ intake }: { intake: Intake }) {
+export function IntakeReview({ intake, lakeName }: { intake: Intake; lakeName?: string }) {
   const { assets, remove, retry, start, cancel } = intake;
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
@@ -287,7 +287,7 @@ export function IntakeReview({ intake }: { intake: Intake }) {
       <section className="transfer-preview" aria-labelledby="simulation-title">
         <div>
           <span className="eyebrow">Local storage</span>
-          <h3 id="simulation-title">Save to your data lake</h3>
+          <h3 id="simulation-title">{lakeName ? `Save to ${lakeName}` : "Save to your data lake"}</h3>
           <label className="dataset-name-input">
             Dataset name{" "}
             <input
