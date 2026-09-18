@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, post } from "../storage/api";
+import { useTheme } from "../theme";
 import "./settings.css";
 type Config = {
   api_python: string;
@@ -83,6 +84,7 @@ type HFDownloadStatus = {
 };
 
 export function Settings() {
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const [info, setInfo] = useState<Info>();
   const [draft, setDraft] = useState<Config>();
   const [busy, setBusy] = useState("");
@@ -376,6 +378,50 @@ export function Settings() {
                 ? " The latest request reused cached evidence; it did not rescore on the GPU."
                 : ""}
             </p>
+          </div>
+          <div className="settings-appearance-card">
+            <div className="settings-appearance-title">
+              <h2>Appearance</h2>
+              <p>Customize the application theme and visual appearance.</p>
+            </div>
+            <div className="theme-selector-group">
+              <button
+                type="button"
+                className={`theme-selector-btn ${theme === "light" ? "active" : ""}`}
+                onClick={() => setTheme("light")}
+                aria-label="Light mode"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="5" />
+                  <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                </svg>
+                Light
+              </button>
+              <button
+                type="button"
+                className={`theme-selector-btn ${theme === "dark" ? "active" : ""}`}
+                onClick={() => setTheme("dark")}
+                aria-label="Dark mode"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+                Dark
+              </button>
+              <button
+                type="button"
+                className={`theme-selector-btn ${theme === "system" ? "active" : ""}`}
+                onClick={() => setTheme("system")}
+                aria-label="System theme"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                  <line x1="8" y1="21" x2="16" y2="21" />
+                  <line x1="12" y1="17" x2="12" y2="21" />
+                </svg>
+                System ({resolvedTheme})
+              </button>
+            </div>
           </div>
           <fieldset disabled={!!busy}>
             <div className="settings-grid">

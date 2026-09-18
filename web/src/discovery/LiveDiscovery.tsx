@@ -149,7 +149,7 @@ export function LiveDiscovery({
       <header>
         <div>
           <span className="live-kicker">YOUR SAVED LAKE · LOKI</span>
-          <h1>Discover your lake</h1>
+          <h1>Discover Your Lake</h1>
           <p>
             Contextual discovery across the indexed lake. No source pairs to
             choose.

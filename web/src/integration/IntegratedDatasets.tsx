@@ -35,14 +35,6 @@ export function IntegratedDatasets({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [limit, setLimit] = useState(12);
-  const [timeout, setTimeoutValue] = useState(120);
-  useEffect(() => {
-    let active = true;
-    api<{settings: {llm: {timeout_seconds: number}}}>("/settings").then(r => {
-      if (active) setTimeoutValue(r.settings.llm.timeout_seconds);
-    }).catch(() => {});
-    return () => {active = false;};
-  }, []);
   const [renaming, setRenaming] = useState("");
   const [runName, setRunName] = useState("");
   const [removing, setRemoving] = useState<Summary>();
@@ -164,9 +156,9 @@ export function IntegratedDatasets({
       <div className="integration-heading">
         <div>
           <span className="live-kicker">
-            FROM DISCOVERED PATHS TO JOINED TABLES
+            FROM TEXT-MEDIATED JOIN PATHS
           </span>
-          <h1>Connect records through their clinical meaning.</h1>
+          <h1>Materialize Integrated Data</h1>
           <p>
             LOKI proposes row pairs. Narrative evidence determines the
             relationship.
@@ -207,19 +199,6 @@ export function IntegratedDatasets({
             onChange={(e) => setLimit(Number(e.target.value))}
           />
         </label>
-        <label>
-          Timeout / request
-          <input
-            aria-label="Generation timeout"
-            type="number"
-            min={0}
-            step={1}
-            value={timeout}
-            disabled={running}
-            onChange={(e) => setTimeoutValue(Number(e.target.value))}
-          />
-          <small>Seconds · 0 = no timeout</small>
-        </label>
         <div className="schema-pill-trigger-wrap">
           <label>
             Schema & Predicates
@@ -245,7 +224,6 @@ export function IntegratedDatasets({
             act(async () => {
               setState(await post<State>("/integration", {
                 limit: state?.resume?.budget ?? limit,
-                timeout,
                 schema_config: schemaConfig,
               }));
               setSelected("");
@@ -255,7 +233,7 @@ export function IntegratedDatasets({
           {state?.resume ? `Resume original batch (${state.resume.completed}/${state.resume.total})` : "Propose with LLM"}
         </button>
         {state?.resume && <button disabled={running} onClick={()=>act(async()=>{
-          setState(await post<State>("/integration",{limit,timeout,new_batch:true,schema_config:schemaConfig}));setSelected("");
+          setState(await post<State>("/integration",{limit,new_batch:true,schema_config:schemaConfig}));setSelected("");
         })}>Start a new batch instead</button>}
       </div>
       <p className="integration-muted">

@@ -68,6 +68,12 @@
 }
 .integration-start input {
   width: 90px;
+  height: 36px;
+  box-sizing: border-box;
+}
+.integration-start > button {
+  height: 36px;
+  box-sizing: border-box;
 }
 .integration-muted {
   font-size: 11px;
@@ -505,6 +511,9 @@
   background: #eaf0ff;
   color: #2159d8;
 }
+.semantic-table th {
+  white-space: nowrap;
+}
 .semantic-table td {
   max-width: 330px;
   min-width: 90px;
@@ -811,6 +820,10 @@
 }
 
 /* --- Relationship Schema Studio & Trigger --- */
+.integration-start > .schema-pill-trigger-wrap {
+  flex: 0 0 auto;
+  min-width: 0;
+}
 .schema-pill-trigger-wrap label {
   display: flex;
   flex-direction: column;
@@ -821,17 +834,24 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 28px;
-  padding: 0 10px;
+  height: 36px;
+  width: 182px;
+  padding: 0 11px;
+  box-sizing: border-box;
   background: #ffffff;
   border: 1px solid #c7d7f0;
   border-radius: 6px;
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 500;
   color: #1e3a8a;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s ease;
+}
+.schema-config-trigger-btn span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .schema-config-trigger-btn:hover:not(:disabled) {
   background: #f0f5ff;

@@ -23,6 +23,8 @@ import { IntakeReview } from "./intake/IntakeReview";
 
 import "./theme.css";
 import "./studio/studio.css";
+import "./dark.css";
+import { useTheme } from "./theme";
 import { LakeScene } from "./studio/LakeScene";
 import { Augmentation, History } from "./augmentation/Review";
 import { SavedLake } from "./storage/SavedLake";
@@ -81,8 +83,8 @@ function Icon({ name, size = 20 }: { name: string; size?: number }) {
     ),
     settings: (
       <>
-        <circle cx="12" cy="12" r="4" />
-        <path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2" />
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
       </>
     ),
     activity: <path d="M2 13h5l3-8 4 14 3-6h5" />,
@@ -110,6 +112,15 @@ function Icon({ name, size = 20 }: { name: string; size?: number }) {
         <path d="M5 20c0-8 9-9 13-16 3 11-2 17-10 13M5 20l9-9" />
       </>
     ),
+    sun: (
+      <>
+        <circle cx="12" cy="12" r="5" />
+        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+      </>
+    ),
+    moon: (
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    ),
   };
   return (
     <svg
@@ -128,6 +139,7 @@ function Icon({ name, size = 20 }: { name: string; size?: number }) {
   );
 }
 function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) => void}) {
+  const { resolvedTheme, toggleTheme } = useTheme();
   const [liveEvidence, setLiveEvidence] = useState<{
     linkId: string;
     companionId?: string;
@@ -290,7 +302,7 @@ function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) =
           aria-label="IDUN home"
         >
           <span className="brand-mark">
-            <img src={publicFile("idun.svg")} width="38" height="38" alt="IDUN logo" />
+            <img src={publicFile("idun.png")} alt="IDUN logo" />
           </span>
           <span className="brand-text">
             <span className="brand-title">IDUN</span>
@@ -338,9 +350,17 @@ function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) =
         <div className="studio-header-actions">
           {lake && onLakeChange && <LakeSelector lake={lake} onChange={onLakeChange} blocked={queue.some(a => a.transfer !== "uploaded")} />}
           <div className="studio-session">
-            <i /> {publicDemo ? "YOUR DEMO WORKSPACE" : "LOCAL WORKSPACE"}{" "}
-            <span>LOKI + THOR</span>
+            <span className="session-line session-status"><i /> {publicDemo ? "YOUR DEMO" : "LOCAL"}</span>
+            <span className="session-line session-title">WORKSPACE</span>
           </div>
+          <button
+            className="nav-item theme-toggle"
+            onClick={toggleTheme}
+            title={resolvedTheme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+            aria-label={resolvedTheme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+          >
+            <Icon name={resolvedTheme === "dark" ? "sun" : "moon"} />
+          </button>
           <button
             className={`nav-item settings-corner ${page === "Settings" ? "active" : ""}`}
             aria-current={page === "Settings" ? "page" : undefined}
@@ -349,7 +369,6 @@ function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) =
             aria-label="Settings"
           >
             <Icon name="settings" />
-            <span>Settings</span>
           </button>
           <button
             className="nav-item logout-corner"
@@ -361,7 +380,6 @@ function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) =
             aria-label="Logout"
           >
             <Icon name="logout" />
-            <span>Logout</span>
           </button>
         </div>
       </aside>

@@ -3,10 +3,36 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "scripts": {
-    "build:pages": "tsc --noEmit && vite build web --config web/vite.showcase.config.mjs && node scripts/prepare-pages.cjs",
-    "check": "tsc --noEmit",
-    "build:showcase": "vite build web --config web/vite.showcase.config.mjs"
+  "scripts": {  
+    "dev": "vite web --host 127.0.0.1",
+	"api": "python backend/server.py",
+    "launch-hidden": "node launch.js",	
+    "build": "tsc --noEmit && vite build web",
+    "preview": "vite preview web --host 127.0.0.1",
+    "test": "node --experimental-strip-types --test web/src/intake/*.test.ts web/src/inference/*.test.ts web/src/discovery/*.test.ts web/src/evidence/*.test.ts web/src/augmentation/*.test.ts",
+    "format": "prettier --write web/src package.json tsconfig.json",
+    "test:discovery": "node scripts/verify-discovery.cjs",
+    "test:evidence": "node scripts/verify-evidence.cjs",
+    "test:compact": "node scripts/verify-compact.cjs",
+    "test:augmentation": "node scripts/verify-augmentation.cjs",
+    "start": "node scripts/start-local.cjs",
+    "test:backend": "python -m unittest discover -s backend -p \"test_*.py\"",
+    "test:storage": "node scripts/verify-storage.cjs",
+    "test:ui": "node scripts/verify-storage.cjs",
+    "test:removal": "node scripts/verify-removal.cjs",
+    "test:readiness": "node scripts/verify-readiness.cjs",
+    "test:profiling": "node scripts/verify-profiling.cjs",
+    "test:loki": "node scripts/verify-loki.cjs",
+    "test:discovery-tabs": "node scripts/verify-discovery-tabs.cjs",
+    "test:landscape": "node scripts/verify-landscape.cjs",
+    "test:real-workbench": "node scripts/verify-real-workbench.cjs",
+    "test:settings": "node scripts/verify-settings.cjs",
+    "test:restart": "node scripts/verify-restart.cjs",
+    "setup": "node scripts/start-local.cjs --setup-only",
+    "build:pages": "tsc --noEmit && vite build web --config web/vite.showcase.config.mjs && node scripts/prepare-pages.cjs"
+  },
+  "engines": {
+    "node": ">=24.0.0"
   },
   "dependencies": {
     "papaparse": "^5.7.0",

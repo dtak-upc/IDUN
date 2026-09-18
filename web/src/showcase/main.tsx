@@ -28,7 +28,7 @@ function Showcase() {
     <div className="showcase">
       <header className="showcase-header">
         <a className="showcase-brand" href={publicBase}>
-          <img src={publicFile("idun.svg")} alt="" />
+          <img src={publicFile("idun.png")} alt="IDUN logo" />
           <span>
             <b>IDUN</b>
             <small>Integrating Data-lake of Unstructured Nature</small>
