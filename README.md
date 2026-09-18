@@ -17,7 +17,7 @@ In modern data lakes (particularly across healthcare, biomedicine, and enterpris
 
 Traditional schema matching and entity resolution techniques fail when tables share neither attribute names nor overlapping key distributions. **IDUN** overcomes this limitation by leveraging unstructured narrative text as **text-mediated join paths**. Rather than relying on manual foreign-key engineering or monolithic prompt-based LLM generation, IDUN discovers latent semantic connections between relational rows and narrative sentences, maps them into a shared space, and materializes high-purity integrated tables with complete provenance.
 
-> **Note on Live Inference:** Live model inference and GPU cross-attention execution are locked in this public web demonstration due to a parallel publication (LOKI) being under review. Everything will be hosted eventually. All interactive discovery graphs, evidence workbenches, relationship projections, and materialized joined tables are pre-computed with synthetic benchmark data and fully navigable.
+> **Note on Live Inference:** Live model inference and GPU cross-attention execution are locked in this public web demonstration due to a parallel publication (LOKI) being under review. Everything will be hosted eventually. All interactive discovery, evidences, integration, and materialized relations as joined tables are actual inference results (pre-computed) using synthetic benchmark data and fully navigable.
 
 ---
 
