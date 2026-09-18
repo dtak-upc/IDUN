@@ -1,4 +1,4 @@
-# IDUN: Integrating Data-lake of Unstructured Nature
+# IDUN: <ins>I</ins>ntegrating <ins>D</ins>ata-lake of <ins>U</ins>nstructured <ins>N</ins>ature
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-blue?style=flat-square)](https://dtak-upc.github.io/IDUN/)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-green.svg?style=flat-square)](LICENSE)
