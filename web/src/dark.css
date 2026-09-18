@@ -325,6 +325,60 @@ body[data-theme="dark"] {
   color: #94a3b8;
 }
 
+/* Lake Profile Card in Dark Mode */
+[data-theme="dark"] .lake-profile {
+  background: #0f172a;
+  border-color: #1e293b;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .lake-profile header {
+  background: transparent !important;
+  border: none !important;
+}
+
+[data-theme="dark"] .lake-profile h2 {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .lake-profile header p {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .profile-metrics {
+  border-color: #1e293b;
+}
+
+[data-theme="dark"] .profile-metrics b {
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .profile-method,
+[data-theme="dark"] .profile-issue,
+[data-theme="dark"] .profile-concepts small,
+[data-theme="dark"] .profile-candidate span {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .profile-concepts span {
+  background: #1e293b;
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .profile-detail,
+[data-theme="dark"] .profile-candidate,
+[data-theme="dark"] .profile-table td,
+[data-theme="dark"] .profile-table th {
+  border-color: #1e293b;
+}
+
+[data-theme="dark"] .lake-profile button:not(header button),
+[data-theme="dark"] .lake-profile select {
+  background: #131d31;
+  border-color: #2b3e63;
+  color: #f1f5f9;
+}
+
 /* Universal Form Dropdowns (<select> and <option>) */
 [data-theme="dark"] select {
   background-color: #131d31 !important;
