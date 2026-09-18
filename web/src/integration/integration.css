@@ -459,11 +459,26 @@
   margin-bottom: 16px;
 }
 .semantic-map {
-  height: 100px;
+  height: 120px;
   position: relative;
-  background: linear-gradient(180deg, #f6f8ff, #fff);
-  border: 1px solid #e5eaf5;
-  margin: 10px 0;
+  background:
+    radial-gradient(circle, rgba(56, 189, 248, 0.12) 1px, transparent 1px) 0 0/16px 16px,
+    linear-gradient(180deg, #070d18 0%, #0c1424 100%);
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(15, 23, 42, 0.08);
+  margin: 12px 0;
+  overflow: hidden;
+}
+.semantic-map::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.03) 50%, transparent 50%),
+              linear-gradient(rgba(56, 189, 248, 0.03) 50%, transparent 50%);
+  background-size: 50% 50%;
+  border: 1px dashed rgba(56, 189, 248, 0.08);
 }
 .semantic-map .semantic-dot {
   position: absolute;
@@ -471,18 +486,56 @@
   height: 10px;
   padding: 0;
   border-radius: 50%;
-  background: #8b99b2;
+  background: #64748b;
+  border: 1.5px solid #0f172a;
   transform: translate(-50%, 50%);
-  border: 1px solid white;
+  box-shadow: 0 0 6px rgba(100, 116, 139, 0.6);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  z-index: 2;
+}
+.semantic-map .semantic-dot:hover {
+  transform: translate(-50%, 50%) scale(1.5);
+  z-index: 5;
 }
 .semantic-map .semantic-dot.include {
-  background: #3264d8;
+  background: #38bdf8;
+  border-color: #0f172a;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.9), 0 0 2px #38bdf8;
 }
 .semantic-map .semantic-dot.conflict {
-  background: #b53354;
+  background: #f43f5e;
+  border-color: #0f172a;
+  box-shadow: 0 0 10px rgba(244, 63, 94, 0.9), 0 0 2px #f43f5e;
 }
 .semantic-map .semantic-dot.selected {
-  outline: 2px solid #e7a800;
+  outline: 2px solid #facc15;
+  outline-offset: 1px;
+  box-shadow: 0 0 14px rgba(250, 204, 21, 0.95), 0 0 4px #facc15;
+  transform: translate(-50%, 50%) scale(1.4);
+  z-index: 6;
+}
+.relationship-space-card {
+  display: flex;
+  flex-direction: column;
+}
+.relationship-space-card .live-kicker {
+  color: #0284c7;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+}
+.relationship-space-card p {
+  color: #0f172a;
+  font-weight: 600;
+  font-size: 13.5px;
+  margin: 4px 0 10px 0;
+  line-height: 1.4;
+}
+.relationship-space-card small {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
 }
 .semantic-summary p,
 .semantic-overview small {

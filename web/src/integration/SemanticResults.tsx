@@ -200,7 +200,7 @@ export function SemanticResults({
         </span>
       </div>
       <div className="semantic-overview">
-        <div>
+        <div className="relationship-space-card">
           <span className="live-kicker">RELATIONSHIP SPACE</span>
           <p>
             LOKI contextual evidence → HDBSCAN → clinical relation refinement

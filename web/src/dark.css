@@ -798,6 +798,18 @@ body[data-theme="dark"] {
   margin-bottom: 18px;
 }
 
+[data-theme="dark"] .relationship-space-card .live-kicker {
+  color: #38bdf8;
+}
+
+[data-theme="dark"] .relationship-space-card p {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .relationship-space-card small {
+  color: #94a3b8;
+}
+
 [data-theme="dark"] .semantic-map {
   height: 120px;
   position: relative;
