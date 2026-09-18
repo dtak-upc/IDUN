@@ -13,7 +13,7 @@ export function getStoredTheme(): Theme {
   } catch {
     // localStorage might be unavailable
   }
-  return "system";
+  return "light"; // Default is ALWAYS light
 }
 
 export function getSystemTheme(): "light" | "dark" {
@@ -34,9 +34,10 @@ export function applyTheme(theme: Theme): "light" | "dark" {
 
 export function useTheme() {
   const [theme, setThemeState] = useState<Theme>(() => getStoredTheme());
-  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">(() =>
-    getStoredTheme() === "system" ? getSystemTheme() : (getStoredTheme() as "light" | "dark")
-  );
+  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">(() => {
+    const initial = getStoredTheme();
+    return initial === "system" ? getSystemTheme() : initial;
+  });
 
   const setTheme = (newTheme: Theme) => {
     try {
@@ -50,7 +51,6 @@ export function useTheme() {
   };
 
   const toggleTheme = () => {
-    // If currently dark (either explicitly or via system), switch to light, and vice versa
     const next = resolvedTheme === "dark" ? "light" : "dark";
     setTheme(next);
   };
@@ -80,7 +80,7 @@ export function useTheme() {
     const onStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY && e.newValue) {
         const t = e.newValue as Theme;
-        if (t === "light" || t === "dark" || t === "system") {
+        if (t === "light" || t === "dark") {
           setThemeState(t);
           setResolvedTheme(applyTheme(t));
         }
