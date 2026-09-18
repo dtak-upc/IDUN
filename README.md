@@ -132,12 +132,51 @@ npm run build:pages
 
 ## Research Foundations
 
-IDUN is built on foundational research in data integration, semantic discovery, and text conceptualization:
+IDUN is built on foundational research in multimodal data discovery and integration, text conceptualization, and representation learning:
 
-* **LOKI:** *Discovery-Driven Integration of Disjoint Tables via Text* (VLDB 2027) — Latent-space cross-attention and text-mediated join discovery.
-* **THOR:** *Mitigating Data Sparsity in Integrated Data through Text Conceptualization* (ICDE 2024) — Deep concept mapping and data augmentation for sparse data lakes.
+* **LOKI:** *Discovery-Driven Integration of Disjoint Tables via Text* (under review at VLDB 2027) - A novel horizontal bi-directional cross-attention architecture for text-mediated join-path discovery.
+* **THOR:** *Mitigating Data Sparsity in Integrated Data through Text Conceptualization* (ICDE 2024) - Deep concept mapping and data augmentation for sparse data lakes.
+* **Foundational Paper:** *Text Data Integration* In Data Engineering for Data Science (Springer 2026) - A comprehensive survey of text data integration techniques and their applications in data engineering.
 
 ---
+
+ ## To Cite the **ICDE-2024** Paper:
+ ```ruby
+@INPROCEEDINGS{rahman2024mitigating,
+        author={Rahman, Md Ataur and Nadal, Sergi and Romero, Oscar and Sacharidis, Dimitris},
+        booktitle={2024 IEEE 40th International Conference on Data Engineering (ICDE)}, 
+        title={Mitigating Data Sparsity in Integrated Data through Text Conceptualization}, 
+        year={2024},
+        volume={},
+        number={},
+        pages={3490-3504},
+        keywords={Annotations;Data integration;Knowledge graphs;Information retrieval;Data engineering;Data models;Complexity theory;Data Integration;Information Extraction;Entity Recognition;Slot-filling},
+        doi={10.1109/ICDE60146.2024.00269}
+}
+```
+
+ ## To Cite the Book Chapter on "Text Data Integration":
+ ```ruby
+@Inbook{AtaurRahman2026,
+        author="Ataur Rahman, Md.
+        and Sacharidis, Dimitris
+        and Romero, Oscar
+        and Nadal, Sergi",
+        editor="Dejaegere, Gilles
+        and Abell{\'o}, Alberto
+        and Torp, Kristian
+        and Simitsis, Alkis",
+        title="Text Data Integration",
+        bookTitle="Data Engineering for Data Science ",
+        year="2026",
+        publisher="Springer Nature Switzerland",
+        address="Cham",
+        pages="3--32",
+        isbn="978-3-032-18765-9",
+        doi="10.1007/978-3-032-18765-9_1",
+        url="https://doi.org/10.1007/978-3-032-18765-9_1"
+}
+```
 
 ## License
 
