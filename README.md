@@ -2,7 +2,7 @@
 
 Integrating Data-lake of Unstructured Nature.
 
-This repository contains the public research-demo. The planned site is https://dtak-upc.github.io/IDUN/ . The site is not published yet.
+This repository contains the public research-demo. The planned site is https://dtak-upc.github.io/IDUN/ .
 
 ## Release status
 
