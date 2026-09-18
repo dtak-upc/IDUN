@@ -1,9 +1,13 @@
-# IDUN: <ins>I</ins>ntegrating <ins>D</ins>ata-lake of <ins>U</ins>nstructured <ins>N</ins>ature
+<img src="web/public/idun.png" alt="IDUN" width="90" align="left"><div align="left"><h1>IDUN: <ins>I</ins>ntegrating <ins>D</ins>ata-lake of <ins>U</ins>nstructured <ins>N</ins>ature</h1></div>
+
+<div align="left">
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-blue?style=flat-square)](https://dtak-upc.github.io/IDUN/)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-green.svg?style=flat-square)](LICENSE)
 
-**IDUN** is an interactive web workspace and research prototype for **discovery-driven integration of disjoint tables and narrative text** within complex data lakes.
+</div>
+
+**IDUN** is an interactive research prototype for **discovery-driven integration of disjoint tables and text** in multi-modal data lakes.
 
 🌐 **Public Demo:** [https://dtak-upc.github.io/IDUN/](https://dtak-upc.github.io/IDUN/)
 
