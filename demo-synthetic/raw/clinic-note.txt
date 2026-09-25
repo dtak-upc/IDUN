@@ -1,7 +1,0 @@
-SYNTHETIC EXAMPLE - FICTIONAL CLINICAL NARRATIVE
-
-Respiratory review
-Asthma was treated with inhaled albuterol. Wheezing improved after albuterol was administered for asthma. Albuterol treatment for asthma was continued.
-
-Metabolic review
-Metformin was prescribed to treat type 2 diabetes. Nausea developed after metformin was started; the clinician attributed the nausea to metformin. Metformin treatment for type 2 diabetes was discontinued because of the nausea. Nausea resolved after metformin was stopped.
