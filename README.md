@@ -144,7 +144,7 @@ IDUN is built on foundational research in multimodal data discovery and integrat
 
 ---
 
- ## To Cite our "LOKI" paper:
+ ## To Cite our **LOKI** paper:
  ```ruby
 @misc{rahman2026discoverydrivenintegrationdisjointtables,
       title={Discovery-Driven Integration of Disjoint Tables via Text}, 
@@ -157,7 +157,7 @@ IDUN is built on foundational research in multimodal data discovery and integrat
 }
 ```
 
- ## To Cite the **ICDE-2024** Paper:
+ ## To Cite the **THOR** Paper:
  ```ruby
 @INPROCEEDINGS{rahman2024mitigating,
         author={Rahman, Md Ataur and Nadal, Sergi and Romero, Oscar and Sacharidis, Dimitris},
@@ -172,7 +172,7 @@ IDUN is built on foundational research in multimodal data discovery and integrat
 }
 ```
 
- ## To Cite the Book Chapter on "Text Data Integration":
+ ## To Cite the Book Chapter on **Text Data Integration**:
  ```ruby
 @Inbook{AtaurRahman2026,
         author="Ataur Rahman, Md.
