@@ -144,6 +144,19 @@ IDUN is built on foundational research in multimodal data discovery and integrat
 
 ---
 
+ ## To Cite our "LOKI" paper:
+ ```ruby
+@misc{rahman2026discoverydrivenintegrationdisjointtables,
+      title={Discovery-Driven Integration of Disjoint Tables via Text}, 
+      author={Md Ataur Rahman and Dimitris Sacharidis and Oscar Romero and Sergi Nadal},
+      year={2026},
+      eprint={2609.26658},
+      archivePrefix={arXiv},
+      primaryClass={cs.IR},
+      url={https://arxiv.org/abs/2609.26658}, 
+}
+```
+
  ## To Cite the **ICDE-2024** Paper:
  ```ruby
 @INPROCEEDINGS{rahman2024mitigating,
@@ -179,19 +192,6 @@ IDUN is built on foundational research in multimodal data discovery and integrat
         isbn="978-3-032-18765-9",
         doi="10.1007/978-3-032-18765-9_1",
         url="https://doi.org/10.1007/978-3-032-18765-9_1"
-}
-```
-
- ## To Cite our "LOKI" paper:
- ```ruby
-@misc{rahman2026discoverydrivenintegrationdisjointtables,
-      title={Discovery-Driven Integration of Disjoint Tables via Text}, 
-      author={Md Ataur Rahman and Dimitris Sacharidis and Oscar Romero and Sergi Nadal},
-      year={2026},
-      eprint={2609.26658},
-      archivePrefix={arXiv},
-      primaryClass={cs.IR},
-      url={https://arxiv.org/abs/2609.26658}, 
 }
 ```
 
