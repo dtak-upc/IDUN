@@ -1,4 +1,4 @@
-<img src="web/public/idun.png" alt="IDUN" width="140" align="left"><div align="left"><h1>IDUN:<br><ins>I</ins>ntegrating <ins>D</ins>ata-lake of <ins>U</ins>nstructured <ins>N</ins>ature</h1></div>
+<img src="web/public/idun.png" alt="IDUN" width="90" align="left"><div align="left"><h1>IDUN: <ins>I</ins>ntegrating <ins>D</ins>ata-lake of <ins>U</ins>nstructured <ins>N</ins>ature</h1></div>
 
 <div align="left">
 
