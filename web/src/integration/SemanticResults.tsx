@@ -1,7 +1,27 @@
 import { apiUrl } from "../storage/api";
 import { useState } from "react";
+import { RelationshipSpace } from "./RelationshipSpace";
+import { RelationshipSuggestions } from "./RelationshipSuggestions";
+import { CombineRelationshipsModal } from "./CombineRelationshipsModal";
+export type SchemaConfig = {
+  mode?: "strict" | "hybrid" | "open";
+  labels?: string[];
+  definitions?: Record<string, string>;
+  prompt_id?: string;
+  context_config?: any;
+  preset?: string;
+};
+
 export type SemanticPlan = {
   id: string;
+  schema_config?: SchemaConfig;
+  content_revision?: string;
+  provenance_status?: string;
+  model_decisions?: Decision[];
+  curation?: {sources:string[];target:string;definition?:string;created:number}[];
+  cached_calls?: number;
+  llm_calls?: number;
+  batch?: {mode?:string;total:number;retained?:number;run_total?:number};
   title: string;
   description: string;
   materialized: boolean;
@@ -26,9 +46,10 @@ export type SemanticPlan = {
   output: JoinedRow[];
 };
 type Source = {
+  source?: string;
   name: string;
   columns: string[];
-  record: { cells: string[] };
+  record: { record_id?: string; cells: string[] };
   anchor_column: number;
 };
 type Path = {
@@ -42,6 +63,7 @@ type Path = {
   ce_score: number;
 };
 type Case = {
+  document_name?: string;
   candidate: string;
   cluster: number;
   noise: boolean;
@@ -63,15 +85,22 @@ type Decision = {
     reason: string;
     diagnosis_quote?: string;
     medication_quote?: string;
+    record_a_quote?: string;
+    record_b_quote?: string;
   }[];
 };
 type JoinedRow = {
   candidate: string;
   left_value: string;
   right_value: string;
+  record_a_value?: string;
+  record_b_value?: string;
   relation: string;
+  direction?: string;
   cluster: number;
   evidence_quote: string;
+  record_a_quote?: string;
+  record_b_quote?: string;
   evidence_count: number;
   path_count?: number;
   left_columns: string[];
@@ -81,10 +110,12 @@ type JoinedRow = {
   left_link: string;
   right_link: string;
 };
-export type DiffStatus = "added" | "changed" | "withdrawn" | "unchanged";
+export type DiffStatus = "added" | "changed" | "withdrawn" | "unchanged" | "not_reviewed";
 
 export type DiffRow = JoinedRow & {
   diff_status?: DiffStatus;
+  diff_key?: string;
+  diff_origin?: "current" | "previous";
   diff_notes?: string;
   previous_relation?: string;
   previous_relations?: string[];
@@ -111,19 +142,76 @@ export type DiffData = {
     changed: number;
     withdrawn: number;
     unchanged: number;
+    not_reviewed?: number;
     total_current: number;
     total_previous: number;
   };
   rows: DiffRow[];
 };
 
-const label = (s: string) => s.replaceAll("_", " ").toLowerCase();
+const label = (s: string) => s;
+
+export function getPredicateStyle(relation: string): React.CSSProperties {
+  if (relation === "ADVERSE_EFFECT") {
+    return { background: "#fae9ef", color: "#9b2044", border: "1px solid #f2c2ce" };
+  }
+  if (relation === "DISCONTINUED") {
+    return { background: "#fff3d8", color: "#846100", border: "1px solid #fae19c" };
+  }
+  if (relation === "CONTRAINDICATED") {
+    return { background: "#fdf2f2", color: "#b91c1c", border: "1px solid #fecaca" };
+  }
+  if (relation === "TREATS" || relation === "INDICATED") {
+    return { background: "#edf2fe", color: "#2f5abe", border: "1px solid #c7d7fc" };
+  }
+  if (relation === "NEGATIVE") {
+    return { background: "#f3f4f6", color: "#4b5563", border: "1px solid #e5e7eb" };
+  }
+  if (relation === "UNRESOLVED") {
+    return { background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" };
+  }
+  const palettes = [
+    { background: "#ecfdf5", color: "#065f46", border: "1px solid #a7f3d0" },
+    { background: "#f5f3ff", color: "#5b21b6", border: "1px solid #ddd6fe" },
+    { background: "#ecfeff", color: "#155e75", border: "1px solid #a5f3fc" },
+    { background: "#fff1f2", color: "#9f1239", border: "1px solid #fecdd3" },
+    { background: "#eff6ff", color: "#1e40af", border: "1px solid #bfdbfe" },
+    { background: "#fdf4ff", color: "#86198f", border: "1px solid #f5d0fe" },
+    { background: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0" },
+    { background: "#f8fafc", color: "#334155", border: "1px solid #cbd5e1" },
+  ];
+  let hash = 0;
+  for (let i = 0; i < relation.length; i++) {
+    hash = (hash * 31 + relation.charCodeAt(i)) >>> 0;
+  }
+  return palettes[hash % palettes.length];
+}
+
+export function isClinicalPlan(plan: SemanticPlan): boolean {
+  const cfg = plan.schema_config;
+  if (cfg) {
+    if (cfg.prompt_id === "clinical-preset-v1") return true;
+    if (cfg.prompt_id === "generic-evidence-v1" || cfg.prompt_id === "open-discovery-v1") return false;
+    if (cfg.mode === "open") return false;
+    const labels = cfg.labels || [];
+    const clinicalMarkers = ["TREATS", "ADVERSE_EFFECT", "DISCONTINUED", "CONTRAINDICATED", "INDICATED"];
+    if (labels.some((l: string) => clinicalMarkers.includes(l))) return true;
+  }
+  const title = (plan.title || "").toLowerCase();
+  const desc = (plan.description || "").toLowerCase();
+  if (title.includes("diagnosis") || title.includes("clinical") || desc.includes("clinical")) {
+    return true;
+  }
+  return false;
+}
+
 export function SemanticResults({
   plan,
   diff,
   busy,
   onMaterialize,
   onEvidence,
+  onPlanUpdated,
   csvHref,
 }: {
   plan: SemanticPlan;
@@ -131,6 +219,7 @@ export function SemanticResults({
   busy: boolean;
   onMaterialize: () => void;
   onEvidence: (l: string, r: string) => void;
+  onPlanUpdated?: (updated: SemanticPlan) => void;
   csvHref?: (relation?: string) => string;
 }) {
   const [view, setView] = useState("table");
@@ -139,6 +228,8 @@ export function SemanticResults({
   const [focus, setFocus] = useState("");
   const [diffMode, setDiffMode] = useState(false);
   const [diffFilter, setDiffFilter] = useState<"all" | DiffStatus>("all");
+  const [remapModalOpen, setRemapModalOpen] = useState(false);
+  const [remapModalSources, setRemapModalSources] = useState<string[]>([]);
 
   const activeRows: DiffRow[] =
     diffMode && diff?.has_previous
@@ -157,17 +248,6 @@ export function SemanticResults({
         ),
       ).values(),
     );
-  const extent = (axis: number) => {
-    const vs = plan.cases.map((c) => c.point?.[axis] || 0);
-    return [Math.min(...vs), Math.max(...vs)];
-  };
-  const bounds = [extent(0), extent(1)];
-  const position = (c: Case, axis: number) => {
-    const [lo, hi] = bounds[axis];
-    return hi === lo
-      ? 50
-      : 5 + (90 * ((c.point?.[axis] || 0) - lo)) / (hi - lo);
-  };
   return (
     <>
       <div className="integration-plan-title">
@@ -180,11 +260,23 @@ export function SemanticResults({
         <p>{plan.description}</p>
         <small>
           {plan.model} · {plan.seconds.toFixed(1)} seconds ·{" "}
-          {plan.coverage.retained_pairs !== undefined && <span>{plan.coverage.retained_pairs} reused · {plan.coverage.updated_pairs} updated · {plan.coverage.pending_pairs} pending. </span>}
+          {plan.coverage.retained_pairs !== undefined && <span>{plan.coverage.retained_pairs} retained candidates · {plan.coverage.updated_pairs} candidates reviewed this batch · {plan.coverage.pending_pairs} pending. </span>}
+          {plan.cached_calls !== undefined && <span>{plan.cached_calls} passage responses reused from cache. </span>}
+          {plan.llm_calls !== undefined && <span>{plan.llm_calls} LLM calls. </span>}
           {plan.coverage.reviewed} of {plan.coverage.available_pairs} row pairs
           reviewed
         </small>
       </div>
+      {!!plan.curation?.length && <details className="integration-muted">
+        <summary>Relationship edit history ({plan.curation.length}) · original labels</summary>
+        {plan.provenance_status !== 'model_original' && <p>Legacy baseline: labels before earlier edits cannot be verified.</p>}
+        <ol>{plan.curation.map((edit, index) => <li key={index}>
+          {edit.sources.join(', ')} → {edit.target} · {new Date(edit.created * 1000).toLocaleString()}
+        </li>)}</ol>
+        <details><summary>Original recorded decisions</summary>
+          <pre style={{maxHeight:240,overflow:'auto',whiteSpace:'pre-wrap'}}>{JSON.stringify(plan.model_decisions, null, 2)}</pre>
+        </details>
+      </details>}
       <div className="integration-counts">
         <span>
           <b>{plan.output.length}</b> joined rows
@@ -203,38 +295,15 @@ export function SemanticResults({
         <div className="relationship-space-card">
           <span className="live-kicker">RELATIONSHIP SPACE</span>
           <p>
-            LOKI contextual evidence → HDBSCAN → clinical relation refinement
+            LOKI contextual evidence → HDBSCAN → {isClinicalPlan(plan) ? "clinical relation refinement" : "relation refinement"}
           </p>
-          <div className="semantic-map" aria-label="Contextual pair projection">
-            {plan.cases.map((c) => {
-              const d = plan.decisions.find((d) => d.candidate === c.candidate);
-              return (
-                <button
-                  key={c.candidate}
-                  className={`semantic-dot ${d?.status || ""} ${focus === c.candidate ? "selected" : ""}`}
-                  style={{
-                    left: `${position(c, 0)}%`,
-                    bottom: `${position(c, 1)}%`,
-                  }}
-                  title={`${c.candidate} · cluster ${c.cluster}${c.noise ? " · singleton/noise" : ""} · ${d?.relations.join(", ") || d?.status}`}
-                  aria-label={`Review pair ${c.candidate}`}
-                  onClick={() => {
-                    setFocus(c.candidate);
-                    setView("decisions");
-                  }}
-                />
-              );
-            })}
-          </div>
-          <small>
-            Each point is a row pair. Position is a 2D projection, not a
-            relation score. Select a point to review it.
-          </small>
+          <RelationshipSpace key={plan.id} cases={plan.cases} decisions={plan.decisions} focus={focus}
+            onSelect={id => { setFocus(id); setView("decisions"); }} />
         </div>
         <div className="semantic-summary">
           <h3>Full records, connected through evidence</h3>
           <p>
-            Diagnosis and medication fields stay attached to each relationship.
+            Record A and Record B fields stay attached to each relationship.
             Different source rows remain separate; multiple evidence passages
             are grouped.
           </p>
@@ -246,6 +315,8 @@ export function SemanticResults({
           </small>
         </div>
       </div>
+      <RelationshipSuggestions key={plan.id} plan={plan} onEvidence={onEvidence}
+        onCombine={labels => { setRemapModalSources(labels); setRemapModalOpen(true); }} />
       <div className="integration-actions">
         <button
           aria-pressed={view === "table"}
@@ -285,6 +356,18 @@ export function SemanticResults({
             </span>
           </button>
         )}
+        <button
+          type="button"
+          className="integration-primary combine-labels-action-btn"
+          disabled={busy || !plan.output.length}
+          onClick={() => {
+            setRemapModalSources([]);
+            setRemapModalOpen(true);
+          }}
+          title="Combine multiple relationships into one or rename relationship labels"
+        >
+          Combine / Rename Labels
+        </button>
         {plan.materialized ? (
           <a
             href={csvHref ? csvHref() : apiUrl(`/integration/${plan.id}/csv`)}
@@ -320,6 +403,9 @@ export function SemanticResults({
             </div>
           </div>
           <div className="diff-stats-pills" role="toolbar" aria-label="Filter by change type">
+            <button type="button" className={`diff-pill ${diffFilter === "not_reviewed" ? "active" : ""}`} onClick={() => setDiffFilter("not_reviewed")}>
+              Not reviewed ({diff.counts.not_reviewed || 0})
+            </button>
             <button
               type="button"
               className={`diff-pill ${diffFilter === "all" ? "active" : ""}`}
@@ -396,6 +482,65 @@ export function SemanticResults({
               const rows = activeRows.filter((r) => r.relation === group);
               const leftCols = cols(rows, "left"),
                 rightCols = cols(rows, "right");
+
+              const groupCases = rows
+                .map((r) => plan.cases?.find((c) => c.candidate === r.candidate))
+                .filter(Boolean);
+
+              const cleanSourceName = (n: string) => {
+                const base = n.replace(/\.[^/.]+$/, "").replaceAll("_", " ").trim();
+                return base.length > 20 ? base.slice(0, 18) + "…" : base;
+              };
+
+              const leftSourceNames = [
+                ...new Set(
+                  groupCases
+                    .map((c) => (c!.left?.name ? cleanSourceName(c!.left.name) : ""))
+                    .filter(Boolean)
+                ),
+              ];
+              const rightSourceNames = [
+                ...new Set(
+                  groupCases
+                    .map((c) => (c!.right?.name ? cleanSourceName(c!.right.name) : ""))
+                    .filter(Boolean)
+                ),
+              ];
+
+              const isClinical = isClinicalPlan(plan);
+
+              const leftLabel = isClinical
+                ? "Diagnosis"
+                : leftSourceNames.length === 1
+                ? `Record A (${leftSourceNames[0]})`
+                : "Record A";
+
+              const relationLabel = isClinical ? "Clinical relationship" : "Relationship";
+
+              const rightLabel = isClinical
+                ? "Medication"
+                : rightSourceNames.length === 1
+                ? `Record B (${rightSourceNames[0]})`
+                : "Record B";
+
+              const attributesLabel = isClinical
+                ? "Dose / route"
+                : rightSourceNames.length === 1
+                ? `${rightSourceNames[0]} attributes`
+                : "Record B attributes";
+
+              const leftColPrefix = isClinical
+                ? "Diagnosis"
+                : leftSourceNames.length === 1
+                ? leftSourceNames[0]
+                : "Record A";
+
+              const rightColPrefix = isClinical
+                ? "Medication"
+                : rightSourceNames.length === 1
+                ? rightSourceNames[0]
+                : "Record B";
+
               return (
                 <section
                   className={`relationship-table-group ${group}`}
@@ -413,18 +558,31 @@ export function SemanticResults({
                         )}
                       </p>
                     </div>
-                    {plan.materialized && (
-                      <a
-                        href={
-                          csvHref
-                            ? csvHref(group)
-                            : apiUrl(`/integration/${plan.id}/csv?relation=${encodeURIComponent(group)}`)
-                        }
-                        download
+                    <div className="relationship-table-heading-actions">
+                      <button
+                        type="button"
+                        className="group-remap-btn"
+                        onClick={() => {
+                          setRemapModalSources([group]);
+                          setRemapModalOpen(true);
+                        }}
+                        title={`Rename or merge ${group}`}
                       >
-                        Download {label(group)} CSV ↓
-                      </a>
-                    )}
+                        Rename / Merge
+                      </button>
+                      {plan.materialized && (
+                        <a
+                          href={
+                            csvHref
+                              ? csvHref(group)
+                              : apiUrl(`/integration/${plan.id}/csv?relation=${encodeURIComponent(group)}`)
+                          }
+                          download
+                        >
+                          Download {label(group)} CSV ↓
+                        </a>
+                      )}
+                    </div>
                   </header>
                   <div className="integration-table semantic-table">
                     <table aria-label={`${label(group)} joined records`}>
@@ -433,20 +591,20 @@ export function SemanticResults({
                           <th>{diffMode ? "Pair / Diff" : "Pair"}</th>
                           {allFields ? (
                             leftCols.map((c, i) => (
-                              <th key={i}>Diagnosis · {c.name}</th>
+                              <th key={i}>{leftColPrefix} · {c.name}</th>
                             ))
                           ) : (
-                            <th>Diagnosis</th>
+                            <th>{leftLabel}</th>
                           )}
-                          <th>Clinical relationship</th>
+                          <th>{relationLabel}</th>
                           {allFields ? (
                             rightCols.map((c, i) => (
-                              <th key={i}>Medication · {c.name}</th>
+                              <th key={i}>{rightColPrefix} · {c.name}</th>
                             ))
                           ) : (
                             <>
-                              <th>Medication</th>
-                              <th>Dose / route</th>
+                              <th>{rightLabel}</th>
+                              <th>{attributesLabel}</th>
                             </>
                           )}
                           <th>Evidence</th>
@@ -456,7 +614,7 @@ export function SemanticResults({
                       <tbody>
                         {rows.map((r) => (
                           <tr
-                            key={`${r.candidate}/${r.relation}/${r.diff_status || ""}`}
+                            key={r.diff_key || `${r.candidate}/${r.relation}/${r.direction || ""}/${r.diff_status || ""}`}
                             className={`semantic-row ${diffMode && r.diff_status ? `diff-row-${r.diff_status}` : ""}`}
                           >
                             <td>
@@ -469,6 +627,7 @@ export function SemanticResults({
                                     {r.diff_status === "changed" && "Δ Changed"}
                                     {r.diff_status === "withdrawn" && "- Withdrawn"}
                                     {r.diff_status === "unchanged" && "= Unchanged"}
+                                    {r.diff_status === "not_reviewed" && "Not reviewed"}
                                   </span>
                                 )}
                               </div>
@@ -487,9 +646,15 @@ export function SemanticResults({
                             <td>
                               <span
                                 className={`semantic-relation ${r.relation}`}
+                                style={getPredicateStyle(r.relation)}
                               >
                                 {label(r.relation)}
                               </span>
+                              {r.direction && r.direction !== "undirected" && (
+                                <small className="direction-badge" style={{ display: "block", color: "#666", fontSize: "0.8em", marginTop: "2px" }}>
+                                  {r.direction === "a_to_b" ? "A → B" : r.direction === "b_to_a" ? "B → A" : r.direction === "bidirectional" ? "A ↔ B" : r.direction}
+                                </small>
+                              )}
                               {diffMode && r.diff_notes && (
                                 <small className="diff-row-notes">{r.diff_notes}</small>
                               )}
@@ -506,17 +671,21 @@ export function SemanticResults({
                               <>
                                 <td>{r.right_value}</td>
                                 <td>
-                                  {["dosage", "unit", "route"]
-                                    .map(
-                                      (c) =>
-                                        r.right_cells[
-                                          r.right_columns.findIndex(
-                                            (n) => n.toLowerCase() === c,
-                                          )
-                                        ],
-                                    )
-                                    .filter(Boolean)
-                                    .join(" · ") || "—"}
+                                  {(() => {
+                                    if (isClinical) {
+                                      const clinical = ["dosage", "unit", "route"]
+                                        .map((c) => r.right_cells[r.right_columns.findIndex((n) => n.toLowerCase() === c)])
+                                        .filter(Boolean)
+                                        .join(" · ");
+                                      if (clinical) return clinical;
+                                    }
+                                    const others = r.right_columns
+                                      .map((name, i) => ({ name, val: r.right_cells[i] }))
+                                      .filter((c, i) => c.val && c.val !== r.right_value && i !== 0)
+                                      .map((c) => `${c.name}: ${c.val}`)
+                                      .join(" · ");
+                                    return others || "—";
+                                  })()}
                                 </td>
                               </>
                             )}
@@ -560,9 +729,9 @@ export function SemanticResults({
             </p>
           )}
           <p className="integration-muted">
-            Clinical relation labels are model proposals. Matching a clinical
-            relationship does not establish patient or admission identity. CSV
-            includes every projected source column and evidence provenance.
+            {isClinicalPlan(plan)
+              ? "Clinical relation labels are model proposals. Matching a clinical relationship does not establish patient or admission identity. CSV includes every projected source column and evidence provenance."
+              : "Relation labels are model proposals. CSV includes every projected source column and evidence provenance."}
           </p>
         </>
       ) : (
@@ -595,6 +764,9 @@ export function SemanticResults({
                   </small>
                   {d.path_decisions.map((v, i) => {
                     const p = c.paths.find((p) => p.evidence === v.evidence)!;
+                    const quoteA = v.record_a_quote || v.diagnosis_quote;
+                    const quoteB = v.record_b_quote || v.medication_quote;
+                    const isClinical = isClinicalPlan(plan);
                     return (
                       <section className="semantic-path" key={i}>
                         <strong>
@@ -602,13 +774,13 @@ export function SemanticResults({
                         </strong>
                         <p>{v.reason}</p>
                         <blockquote>{p.context_text || p.text}</blockquote>
-                        {(v.diagnosis_quote || v.medication_quote) && (
+                        {(quoteA || quoteB) && (
                           <p>
-                            Diagnosis evidence:{" "}
-                            {v.diagnosis_quote || "Not established"}
+                            {isClinical ? "Diagnosis evidence" : "Record A evidence"}:{" "}
+                            {quoteA || "Not established"}
                             <br />
-                            Medication evidence:{" "}
-                            {v.medication_quote || "Not established"}
+                            {isClinical ? "Medication evidence" : "Record B evidence"}:{" "}
+                            {quoteB || "Not established"}
                           </p>
                         )}
                         <small>
@@ -637,6 +809,19 @@ export function SemanticResults({
             })}
         </div>
       )}
+      <CombineRelationshipsModal
+        isOpen={remapModalOpen}
+        onClose={() => setRemapModalOpen(false)}
+        plan={plan}
+        initialSources={remapModalSources}
+        onPlanUpdated={(updated) => {
+          const newRelations = [...new Set(updated.output.map((r) => r.relation))];
+          if (relation !== "all" && !newRelations.includes(relation)) {
+            setRelation("all");
+          }
+          onPlanUpdated?.(updated);
+        }}
+      />
     </>
   );
 }

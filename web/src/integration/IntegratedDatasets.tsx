@@ -1,6 +1,6 @@
-import { publicFile } from "../showcase/paths";
+import { savedCsvHref } from "../showcase/snapshot";
 import { useEffect, useRef, useState } from "react";
-import { api, post } from "../storage/api";
+import { api, post, selectedApiLake } from "../storage/api";
 import { SemanticResults, type SemanticPlan, type DiffData } from "./SemanticResults";
 import { RelationshipSchemaStudio, type SchemaConfig, DEFAULT_LABELS } from "./RelationshipSchemaStudio";
 import "./integration.css";
@@ -17,8 +17,8 @@ type Summary = {
 };
 type State = {
   discovery_ready: boolean;
-  resume?: {budget:number;total:number;completed:number} | null;
-  job?: { status: string; phase: string; completed: number; total: number };
+  resume?: {budget:number;total:number;completed:number;fingerprint:string;schema_config:SchemaConfig | null} | null;
+  job?: { status: string; phase: string; completed: number; total: number; plan_id?: string };
   plans: Summary[];
 };
 export function IntegratedDatasets({
@@ -35,6 +35,7 @@ export function IntegratedDatasets({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [limit, setLimit] = useState(12);
+  const [runMode, setRunMode] = useState<'new' | 'extend' | 'rebuild'>('new');
   const [renaming, setRenaming] = useState("");
   const [runName, setRunName] = useState("");
   const [removing, setRemoving] = useState<Summary>();
@@ -43,6 +44,7 @@ export function IntegratedDatasets({
   const [loaded, setLoaded] = useState<{ key: string; plan: SemanticPlan }>();
   const [diffData, setDiffData] = useState<DiffData | null>(null);
   const [schemaStudioOpen, setSchemaStudioOpen] = useState(false);
+  const [schemaReady, setSchemaReady] = useState(savedDemo);
   const [schemaConfig, setSchemaConfig] = useState<SchemaConfig>({
     mode: "strict",
     labels: [...DEFAULT_LABELS],
@@ -50,6 +52,15 @@ export function IntegratedDatasets({
   });
   const [hfLoaded, setHfLoaded] = useState<{ loaded: boolean; repo_id: string; vram_mb: number } | null>(null);
   const [unloading, setUnloading] = useState(false);
+
+  useEffect(() => {
+    if (savedDemo) return;
+    const controller = new AbortController();
+    void api<SchemaConfig>("/integration/schema", { signal: controller.signal })
+      .then(config => { if (!controller.signal.aborted) { setSchemaConfig(config); setSchemaReady(true); } })
+      .catch(error => { if (!controller.signal.aborted) setError(`Could not load lake schema: ${String(error)}`); });
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     if (!menuOpenRunId) return;
@@ -148,6 +159,14 @@ export function IntegratedDatasets({
     }
   }
 
+  async function propose() {
+    if (runMode !== 'new' && !plan?.content_revision) throw Error('Select a loaded base run first.');
+    setState(await post<State>('/integration', {
+      mode: runMode, limit, new_batch: true, schema_config: schemaConfig,
+      ...(runMode !== 'new' ? {base_run_id: plan!.id, base_revision: plan!.content_revision} : {}),
+    }));
+  }
+
   return (
     <section
       className="integrated-datasets"
@@ -184,16 +203,25 @@ export function IntegratedDatasets({
           <strong>Build a semantic integration</strong>
           <p>
             Automatically rank complementary row pairs, cluster their evidence
-            and infer clinical relationships.
+            and infer relationships.
           </p>
         </div>
         <label>
-          New/changed row-pair budget
+          Operation
+          <select aria-label="Integration operation" value={runMode} disabled={running}
+            onChange={e => setRunMode(e.target.value as typeof runMode)}>
+            <option value="new">New run</option>
+            <option value="extend" disabled={!summary}>Extend selected run</option>
+            <option value="rebuild" disabled={!summary}>Rebuild selected run</option>
+          </select>
+        </label>
+        <label>
+          {runMode === 'extend' ? 'Additional / changed candidates' : 'Total candidates'}
           <input
             aria-label="Integration candidate budget"
             type="number"
             min={1}
-            max={100}
+            max={5000}
             value={limit}
             disabled={running}
             onChange={(e) => setLimit(Number(e.target.value))}
@@ -205,7 +233,7 @@ export function IntegratedDatasets({
             <button
               type="button"
               className="schema-config-trigger-btn"
-              disabled={running}
+              disabled={running || !schemaReady}
               onClick={() => setSchemaStudioOpen(true)}
               aria-haspopup="dialog"
             >
@@ -219,25 +247,26 @@ export function IntegratedDatasets({
         </div>
         <button
           className="integration-primary"
-          disabled={running || !state?.discovery_ready}
+          disabled={running || !schemaReady || !state?.discovery_ready || (runMode !== 'new' && !plan?.content_revision)}
           onClick={() =>
             act(async () => {
-              setState(await post<State>("/integration", {
-                limit: state?.resume?.budget ?? limit,
-                schema_config: schemaConfig,
-              }));
-              setSelected("");
+              await propose();
             })
           }
         >
-          {state?.resume ? `Resume original batch (${state.resume.completed}/${state.resume.total})` : "Propose with LLM"}
+          {runMode === 'new' ? 'Propose with LLM' : runMode === 'extend' ? 'Extend selected run' : 'Rebuild selected run'}
         </button>
-        {state?.resume && <button disabled={running} onClick={()=>act(async()=>{
-          setState(await post<State>("/integration",{limit,new_batch:true,schema_config:schemaConfig}));setSelected("");
-        })}>Start a new batch instead</button>}
+        {state?.resume && <button disabled={running || !schemaReady} onClick={()=>act(async()=>{
+          setState(await post<State>("/integration",{resume:state.resume!.fingerprint,limit:state.resume!.budget}));
+        })}>Resume original batch ({state.resume.completed}/{state.resume.total})</button>}
       </div>
+      {runMode !== 'new' && <p className="integration-muted">Base run: <strong>{summary?.title} · {summary?.id.slice(0,8)}</strong>. Select a different run below to change the base.
+        {runMode === 'extend' ? ' Preserves its results and naming edits; uses its original inference schema and requires matching model settings. The budget covers additions or changed evidence.' : ' Ranks up to the total budget using current settings and inherits naming edits.'}
+        {' '}Creates a separate snapshot; the base run is preserved.</p>}
+      {state?.resume && <p className="integration-muted">Resume keeps its original selection, schema and budget ({state.resume.budget}); the input above only applies to a new operation.</p>}
+      {runMode === 'new' && <p className="integration-muted">New runs label the selected candidates afresh. Discovery and ranking may reuse compatible results; earlier LLM answers are not reused. Budget: 1–5,000 candidates, subject to available evidence.</p>}
       <p className="integration-muted">
-        Clinical profile: diagnosis and medication roles are detected from
+        Lake profile: source table and text roles are detected from
         projected columns. Identifiers, filenames and folder relationships are
         not model inputs. Requests use the provider selected in Settings.
       </p>
@@ -252,7 +281,7 @@ export function IntegratedDatasets({
           {error}
         </p>
       )}
-      {state?.job && (
+      {state?.job && state.job.status !== 'complete' && (
         <div role="status" className="integration-job">
           <span>
             {state.job.phase}{" "}
@@ -272,6 +301,11 @@ export function IntegratedDatasets({
           )}
         </div>
       )}
+      {selected && plan?.id === selected && <div role="status" className="integration-job" aria-label="Selected run status">
+        <span>Proposal ready for review · {plan.cases.length}/{plan.cases.length} candidates
+          {plan.batch?.mode === 'extend' && ` · ${plan.batch.retained ?? 0} retained · ${plan.batch.total} reviewed in this extension`}
+        </span>
+      </div>}
       <div className="integration-layout">
         <aside className="integration-library">
           <span className="live-kicker">INTEGRATION RUNS</span>
@@ -378,11 +412,17 @@ export function IntegratedDatasets({
           {plan ? (
             <SemanticResults
               key={plan.id}
-              csvHref={savedDemo ? (relation) => publicFile(`demo/${relation || "all"}.csv`) : undefined}
+              csvHref={savedDemo ? (relation) => savedCsvHref(selectedApiLake(), plan.id, relation) : undefined}
               plan={plan}
               diff={diffData || undefined}
               busy={running}
               onEvidence={onEvidence}
+              onPlanUpdated={(updatedPlan) => {
+                setLoaded({ key, plan: updatedPlan });
+                void api<DiffData>(`/integration/${updatedPlan.id}/diff`).then(d => setDiffData(d)).catch(() => null);
+                void api<SchemaConfig>("/integration/schema").then(c => setSchemaConfig(c)).catch(() => null);
+                void api<State>("/integration").then(s => setState(s)).catch(() => null);
+              }}
               onMaterialize={() =>
                 act(async () => {
                   await post(`/integration/${plan.id}/materialize`);
@@ -392,11 +432,10 @@ export function IntegratedDatasets({
             />
           ) : (
             <div className="integration-empty">
-              <h2>Diagnosis + medication + evidence → a joined table</h2>
+              <h2>Record A + Record B + evidence → a joined table</h2>
               <p>
-                Review treatment, adverse-effect, discontinuation and
-                contraindication relationships. Unsupported pairs stay visible
-                in the decision review.
+                Review evidence-grounded relationships between source records. Unsupported
+                pairs stay visible in the decision review.
               </p>
               <p>No source-pair selection or annotation files are required.</p>
             </div>
@@ -431,7 +470,7 @@ export function IntegratedDatasets({
                   maxLength={120}
                   required
                   autoFocus
-                  placeholder="e.g. Diagnosis–medication integration"
+                  placeholder="e.g. Tabular relationship integration"
                   onChange={(e) => setRunName(e.target.value)}
                 />
               </div>
@@ -495,7 +534,10 @@ export function IntegratedDatasets({
         isOpen={schemaStudioOpen}
         onClose={() => setSchemaStudioOpen(false)}
         config={schemaConfig}
-        onSave={(newCfg) => setSchemaConfig(newCfg)}
+        onSave={async (newCfg) => {
+          const saved = savedDemo ? newCfg : await post<SchemaConfig>("/integration/schema", newCfg);
+          setSchemaConfig(saved);
+        }}
         disabled={savedDemo || running}
       />
     </section>

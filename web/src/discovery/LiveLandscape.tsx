@@ -190,7 +190,7 @@ export function LiveLandscape({
                 <span className="live-kicker">CONNECTION IN FOCUS</span>
                 <h3>{focus.name}</h3>
                 <p>
-                  {focus.links.toLocaleString()} row–text links to{" "}
+                  {focus.links.toLocaleString()} row-sentence atomic links to{" "}
                   <strong>{group.name}</strong>.
                 </p>
                 <div className="lake-evidence-label">
@@ -222,8 +222,8 @@ export function LiveLandscape({
             Showing {current.neighborhoods.length} of {current.total} text
             neighborhoods, ranked by connected table count, then highest score.
             Each map shows up to six tables. Multiple tables linked to a
-            document need not share the same text unit; inspect Shared-text
-            bridges below for that stronger candidate condition.
+            document need not share the same text unit; inspect Join-path
+            candidates below for that stronger candidate condition.
           </p>
         </>
       )}

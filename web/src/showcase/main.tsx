@@ -76,7 +76,7 @@ function Showcase() {
                 relationship tables.
               </p>
               <button onClick={() => setPage("Evidence")}>
-                Explore row–text evidence →
+                Explore row-sentence atomic links →
               </button>
               <button onClick={() => setPage("Integration")}>
                 View integrated tables →
@@ -87,7 +87,7 @@ function Showcase() {
                 <b>{Object.keys(data.sources).length}</b> raw sources
               </span>
               <span>
-                <b>{data.links.length}</b> saved row–text links
+                <b>{data.links.length}</b> saved row-sentence atomic links
               </span>
               <span>
                 <b>{data.plan.output.length}</b> joined rows

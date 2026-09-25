@@ -564,7 +564,7 @@ function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) =
               </details>
             </>
           ) : page === "Settings" ? (
-            <Settings />
+            <Settings activeLake={lake?.name || lake?.id} />
           ) : page === "Integration" ? (
             <>
               <IntegratedDatasets

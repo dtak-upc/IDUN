@@ -238,7 +238,7 @@ export function RealWorkbench({
                       {rank?.value?.kind === "txt" ? "Table" : "Document"}
                     </th>
                     <th>LOKI score</th>
-                    <th>Retained links</th>
+                    <th>Retained atomic links</th>
                     <th>Evidence state</th>
                   </tr>
                 </thead>
@@ -283,9 +283,9 @@ export function RealWorkbench({
           </section>
           <div className="rw-link-controls">
             <label>
-              Evidence link
+              Evidence atomic link
               <select
-                aria-label="Evidence link"
+                aria-label="Evidence atomic link"
                 value={
                   page?.value?.items.some((l) => l.id === selected)
                     ? selected
@@ -316,7 +316,7 @@ export function RealWorkbench({
               >
                 Previous links
               </button>
-              <span>{page?.value?.total ?? 0} links</span>
+              <span>{page?.value?.total ?? 0} atomic links</span>
               <button
                 disabled={!page?.value || offset + 20 >= page.value.total}
                 onClick={() => {
@@ -336,7 +336,7 @@ export function RealWorkbench({
             <>
               <div className="rw-selection">
                 <strong>
-                  {companion ? "Shared-text bridge" : "Row-to-text evidence"}
+                  {companion ? "Join-path candidate" : "Row-sentence atomic link"}
                 </strong>
                 <span>
                   Row {detail.links[0].row_index} · score{" "}

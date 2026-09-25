@@ -10,6 +10,11 @@
   --line: #d8dfeb;
   --action: var(--loki-blue);
   --muted: var(--ink-muted);
+  --bg-muted: #f1f5f9;
+  --border: #e2e8f0;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --text-success: #15803d;
   color: var(--ink);
   background: #f5f7fb;
   font-family: Inter, "Segoe UI", Arial, sans-serif;

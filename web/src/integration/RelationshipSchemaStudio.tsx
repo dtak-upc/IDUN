@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api, post } from "../storage/api";
 import "./integration.css";
 
@@ -11,8 +11,12 @@ export type SchemaPredicate = {
   occurrences?: number;
   is_default?: boolean;
   sample_quotes?: {
-    diagnosis: string;
-    medication: string;
+    record_a?: string;
+    record_b?: string;
+    record_a_name?: string;
+    record_b_name?: string;
+    diagnosis?: string;
+    medication?: string;
     quote: string;
     reason?: string;
     document?: string;
@@ -24,10 +28,15 @@ export type SchemaConfig = {
   mode: SchemaMode;
   labels: string[];
   definitions: Record<string, string>;
+  prompt_id?: string;
 };
 
 export type ProbeResponse = {
   probed_count: number;
+  attempted_count?: number;
+  failed_count?: number;
+  failures?: { candidate_id: string; error: string }[];
+  sampling?: string;
   available_pairs: number;
   defaults: { label: string; definition: string; enabled: boolean }[];
   suggestions: SchemaPredicate[];
@@ -55,7 +64,7 @@ export function RelationshipSchemaStudio({
   isOpen: boolean;
   onClose: () => void;
   config: SchemaConfig;
-  onSave: (newConfig: SchemaConfig) => void;
+  onSave: (newConfig: SchemaConfig) => void | Promise<void>;
   disabled?: boolean;
 }) {
   const [localConfig, setLocalConfig] = useState<SchemaConfig>(config);
@@ -63,9 +72,38 @@ export function RelationshipSchemaStudio({
   const [customDef, setCustomDef] = useState("");
   const [probeResult, setProbeResult] = useState<ProbeResponse | null>(null);
   const [probing, setProbing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [probeError, setProbeError] = useState("");
   const [expandedQuote, setExpandedQuote] = useState<string | null>(null);
   const [sampleSize, setSampleSize] = useState<number>(6);
+  const probeEpoch = useRef(0);
+  type ProbeState = { job?: { operation?: string; status: string; phase: string; result?: ProbeResponse } };
+  const showProbeState = (state: ProbeState) => {
+    const job = state.job;
+    if (job?.operation !== "relationship_probe") return;
+    setProbing(["queued", "running", "cancelling"].includes(job.status));
+    if (job.result) setProbeResult(job.result);
+    if (["failed", "cancelled", "interrupted"].includes(job.status)) setProbeError(job.phase);
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      const epoch = probeEpoch.current;
+      try {
+        const state = await api<ProbeState>("/integration", { signal: controller.signal });
+        if (!controller.signal.aborted && epoch === probeEpoch.current) showProbeState(state);
+      } catch (error) {
+        if (!controller.signal.aborted) setProbeError(String(error));
+      } finally {
+        if (!controller.signal.aborted) timer = setTimeout(poll, 1000);
+      }
+    }
+    void poll();
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [isOpen]);
 
   useEffect(() => {
     setLocalConfig(config);
@@ -129,16 +167,19 @@ export function RelationshipSchemaStudio({
   };
 
   const handleProbe = async () => {
+    probeEpoch.current++;
     setProbing(true);
     setProbeError("");
+    setProbeResult(null);
     try {
-      const res = await post<ProbeResponse>("/integration/schema/probe", {
+      const res = await post<ProbeState>("/integration/schema/probe", {
         sample_size: sampleSize,
       });
-      setProbeResult(res);
+      probeEpoch.current++;
+      showProbeState(res);
     } catch (err: any) {
+      probeEpoch.current++;
       setProbeError(err?.message || String(err));
-    } finally {
       setProbing(false);
     }
   };
@@ -155,7 +196,7 @@ export function RelationshipSchemaStudio({
     <div
       className="lake-modal-overlay"
       role="presentation"
-      onClick={() => !probing && onClose()}
+      onClick={() => !probing && !saving && onClose()}
     >
       <div
         className="schema-studio-modal"
@@ -184,7 +225,7 @@ export function RelationshipSchemaStudio({
             <div>
               <h3 id="schema-studio-title">Relationship Schema Studio</h3>
               <p className="schema-header-desc">
-                Probe discovered join paths for emergent relationships, customize clinical predicates, or enable open-ended typing.
+                Probe discovered join paths for emergent relationships, customize predicates, or enable open-ended typing.
               </p>
             </div>
           </div>
@@ -192,7 +233,7 @@ export function RelationshipSchemaStudio({
             type="button"
             className="schema-close-btn"
             aria-label="Close schema studio"
-            disabled={probing}
+            disabled={probing || saving}
             onClick={onClose}
           >
             ✕
@@ -254,7 +295,7 @@ export function RelationshipSchemaStudio({
               <div>
                 <span className="schema-section-title">Discover Lake Relationships</span>
                 <p className="schema-probe-desc">
-                  Run a fast zero-shot probe across diverse clinical documents and table rows to suggest emergent relationship types.
+                  Run a fast zero-shot probe across diverse documents and table rows to suggest emergent relationship types.
                 </p>
               </div>
               <div className="schema-probe-controls">
@@ -293,6 +334,10 @@ export function RelationshipSchemaStudio({
                     </>
                   )}
                 </button>
+                {probing && <button type="button" onClick={async () => {
+                  try { showProbeState(await post<ProbeState>("/integration/cancel")); }
+                  catch (error) { setProbeError(String(error)); }
+                }}>Cancel probe</button>}
               </div>
             </div>
 
@@ -305,15 +350,19 @@ export function RelationshipSchemaStudio({
             {probeResult && (
               <div className="schema-probe-results">
                 <div className="schema-probe-meta">
-                  <span>Probed {probeResult.probed_count} candidate paths across lake</span>
+                  <span>{probeResult.probed_count} successful samples · {probeResult.failed_count || 0} failed</span>
                   {probeResult.suggestions.length > 0 ? (
                     <span className="schema-badge-green">
                       {probeResult.suggestions.length} relationship types found
                     </span>
                   ) : (
-                    <span>No novel relationships found beyond baseline</span>
+                    <span>No grounded relationship suggestions in successful samples</span>
                   )}
                 </div>
+                <p>{probeResult.sampling}</p>
+                {!!probeResult.failures?.length && <details><summary>Inspect failed samples</summary>
+                  {probeResult.failures.map(f => <p key={f.candidate_id}>{f.candidate_id}: {f.error}</p>)}
+                </details>}
 
                 <div className="schema-suggestions-list">
                   {probeResult.suggestions.map((s) => {
@@ -361,8 +410,8 @@ export function RelationshipSchemaStudio({
                             {s.sample_quotes.map((q, qIdx) => (
                               <div key={qIdx} className="suggestion-quote-item">
                                 <div className="quote-anchors">
-                                  <span>Diagnosis: <strong>{q.diagnosis}</strong></span>
-                                  <span>Medication: <strong>{q.medication}</strong></span>
+                                  <span>{q.record_a_name || "Record A"}: <strong>{q.record_a || q.diagnosis}</strong></span>
+                                  <span>{q.record_b_name || "Record B"}: <strong>{q.record_b || q.medication}</strong></span>
                                 </div>
                                 <blockquote className="quote-text">
                                   &ldquo;{q.quote || q.text}&rdquo;
@@ -515,13 +564,21 @@ export function RelationshipSchemaStudio({
             <button
               type="button"
               className="schema-btn-primary"
-              disabled={probing}
-              onClick={() => {
-                onSave(localConfig);
-                onClose();
+              disabled={probing || saving}
+              onClick={async () => {
+                setSaving(true);
+                setProbeError("");
+                try {
+                  await onSave(localConfig);
+                  onClose();
+                } catch (error) {
+                  setProbeError(`Could not save schema: ${String(error)}`);
+                } finally {
+                  setSaving(false);
+                }
               }}
             >
-              Apply Schema
+              {saving ? "Saving…" : "Apply Schema"}
             </button>
           </div>
         </div>

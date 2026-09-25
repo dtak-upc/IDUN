@@ -256,16 +256,16 @@ export function LiveDiscovery({
           </p>
           <div className="live-metrics">
             <span>
-              <b>{result.summary?.links}</b> row–text links
+              <b>{result.summary?.links}</b> row-sentence atomic links
             </span>
             <span>
-              <b>{result.summary?.bridges}</b> bridge candidates
+              <b>{result.summary?.bridges}</b> join-path candidates
             </span>
             <span>
               <b>{result.summary?.one_sided}</b> one-sided links
             </span>
             <span>
-              <b>{result.summary?.contexts}</b> scored contexts
+              <b>{result.summary?.contexts}</b> table-text pairs
             </span>
           </div>
           <p>{result.notice}</p>
@@ -280,15 +280,15 @@ export function LiveDiscovery({
             <summary>Coverage and execution</summary>
             <p>
               {result.coverage?.eligible_links} scores met the threshold before
-              the per-row cap. Bridge budgets omitted{" "}
+              the per-row cap. Join-path budgets omitted{" "}
               {result.coverage?.bridge_group_links_omitted} group-link entries
-              and {result.coverage?.bridges_omitted} bridge candidates. Text
+              and {result.coverage?.bridges_omitted} join-path candidates. Text
               units retain Step 08's provisional segmentation and sampling.
               Links without cross-table support remain available for later
               augmentation.
             </p>
             <p>
-              Last scoring work: {result.work?.scored_contexts} contexts ·{" "}
+              Last scoring work: {result.work?.scored_contexts} table-text pairs ·{" "}
               {result.work?.peak_reserved_gib.toFixed(2)} GiB PyTorch peak
               reservation · {result.work?.seconds.toFixed(2)} seconds.
             </p>
@@ -301,7 +301,7 @@ export function LiveDiscovery({
                 setPage(0);
               }}
             >
-              Row–text links
+              Row-sentence atomic links
             </button>
             <button
               aria-pressed={view === "bridges"}
@@ -310,7 +310,7 @@ export function LiveDiscovery({
                 setPage(0);
               }}
             >
-              Shared-text bridges
+              Join-path candidates
             </button>
             {view === "links" && (
               <select
@@ -381,7 +381,7 @@ export function LiveDiscovery({
                   </span>
                   <span className="live-score">{item.score.toFixed(3)}</span>
                   <p>
-                    Inspect both rows and their shared evidence. This is a join
+                    Inspect both rows and their shared evidence. This is a join-path
                     candidate, not a materialized relation.
                   </p>
                 </button>

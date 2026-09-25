@@ -1,4 +1,5 @@
 let activeLake = "";
+export function selectedApiLake() { return activeLake; }
 export function selectApiLake(id: string) { activeLake = id; }
 export function apiUrl(path: string, lake = activeLake) {
   const global = /^\/(settings|health|lakes)(?:\/|$)/.test(path);
