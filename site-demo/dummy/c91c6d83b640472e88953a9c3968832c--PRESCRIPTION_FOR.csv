@@ -1,0 +1,3 @@
+﻿candidate,relationship,direction,record_a,record_b,evidence
+P1,PRESCRIPTION_FOR,b_to_a,"{""diagnosis"": ""Insomnia"", ""category"": ""Sleep"", ""status"": ""Active""}","{""drug"": ""Zolpidem"", ""dosage"": ""5"", ""unit"": ""mg"", ""route"": ""Oral""}","Sleep review
+Zolpidem was prescribed to treat insomnia. Confusion developed after zolpidem was administered; the clinician attributed the confusion to zolpidem. Zolpidem treatment for insomnia was discontinued because of confusion. Confusion resolved after zolpidem was withdrawn."

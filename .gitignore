@@ -1,0 +1,9 @@
+node_modules/
+.idun/
+web/dist/
+Datasets/
+research/
+.env
+.env.*
+__pycache__/
+*.pyc

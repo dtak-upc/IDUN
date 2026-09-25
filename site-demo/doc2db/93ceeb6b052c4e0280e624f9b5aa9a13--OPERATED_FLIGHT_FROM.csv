@@ -1,0 +1,24 @@
+﻿candidate,relationship,direction,record_a,record_b,evidence
+P13,OPERATED_FLIGHT_FROM,a_to_b,"{""Code"": ""19790"", ""Description"": ""Delta Air Lines Inc.: DL""}","{""Code"": ""ATL"", ""Description"": ""Atlanta, GA: Hartsfield-Jackson Atlanta International""}","<table>
+<tr>
+<td>On August 10, 2018, flight 5465 was operated by carrier 20363. A flight was operated by Air Carrier 19393. This authorization is subject to the meteorological limits of the assigned terminal airspace.</td>
+</tr>
+<tr>
+<td>On August 24, 2018, a flight departed from PHX. On August 23, 2018, flight 3328 was operated by carrier 20304, departing from SJC and arriving at DAL. Supplemental ground support equipment must be maintained in accordance with standard apron protocols.</td>
+</tr>
+<tr>
+<td>On August 5, 2018, air carrier 19805 operated a flight. On August 3, 2018, carrier 19790 operated a scheduled flight originating from ATL. Routine tarmac inspections are logged separately in the master maintenance ledger.</td>
+</tr>
+<tr>
+<td>On August 6, 2018, air carrier 19805 operated flight number 2673. On August 7, 2018, air carrier 20445 operated flight number 4884. Cargo loading parameters remain under the strict jurisdiction of the duty dispatch supervisor.</td>
+</tr>
+<tr>
+<td>On August 30, 2018, air carrier 19790 operated flight number 1384. On August 30, 2018, air carrier 19790 operated flight number 1384. On August 30, 2018, air carrier 19790 operated flight number 1384. Fuel density checks were systematically completed and verified prior to block-out procedures.</td>
+</tr>
+<tr>
+<td>On August 8, 2018, Carrier 20237 operated a flight originating from BDL. On August 20, 2018, carrier 19805 operated flight 2256. Air traffic clearance wait times may fluctuate significantly during peak domestic operational windows.</td>
+</tr>
+<tr>
+<td>On August 28, 2018, flight number 3846 was operated by air carrier 20398. On August 3, 2018, flight 694 was operated by the air carrier with code 19393. Any minor deviations from standard instrument routing instructions require immediate digital notification to the central command hub.</td>
+</tr>
+</table>"

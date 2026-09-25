@@ -1,0 +1,2 @@
+﻿candidate,relationship,direction,record_a,record_b,evidence
+P49,MENTIONS_JOINT_GROUP_MEMBER,undirected,"{""City_ID"": ""11"", ""City"": ""Jiaxing ( Zhejiang )"", ""Hanzi"": """", ""Hanyu_Pinyin"": """", ""Regional_Population"": ""4501700"", ""GDP"": ""266.81""}","{""City"": ""Jinhua ( Zhejiang )"", ""Hanzi"": """", ""Hanyu_Pinyin"": """", ""Regional_Population"": ""4614100"", ""GDP"": ""244.77""}","#### 3. Zhejiang Province: Jinhua, Jiaxing, and Derived Metrics"

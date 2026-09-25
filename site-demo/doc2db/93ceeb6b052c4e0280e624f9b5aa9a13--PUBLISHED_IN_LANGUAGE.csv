@@ -1,0 +1,2 @@
+﻿candidate,relationship,direction,record_a,record_b,evidence
+P96,PUBLISHED_IN_LANGUAGE,a_to_b,"{""publisher_id"": ""145"", ""publisher_name"": ""Audio Literature""}","{""language_id"": ""1"", ""language_code"": """", ""language_name"": ""English""}",        *Primary English: Knowledge and Understanding*. By Eleanor Vance. The book 'Primary English: Knowledge and Understanding' was published by Audio Literature. This particular publication is an English-language text. The book has a length of 218 pages. $35.00 cloth.

@@ -1,0 +1,4 @@
+﻿candidate,relationship,direction,record_a,record_b,evidence
+P5,TREATS_CONDITION,b_to_a,"{""diagnosis"": ""Type 2 diabetes"", ""category"": ""Metabolic"", ""status"": ""Active""}","{""drug"": ""Metformin"", ""dosage"": ""500"", ""unit"": ""mg"", ""route"": ""Oral""}","Metabolic review
+Metformin was prescribed to treat type 2 diabetes. Nausea developed after metformin was started; the clinician attributed the nausea to metformin. Metformin treatment for type 2 diabetes was discontinued because of the nausea. Nausea resolved after metformin was stopped.
+"

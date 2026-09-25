@@ -1,0 +1,17 @@
+{
+  "default_id": "dummy",
+  "lakes": [
+    {
+      "id": "dummy",
+      "name": "Dummy",
+      "files": 4,
+      "snapshot": "dummy/snapshot.json"
+    },
+    {
+      "id": "doc2db",
+      "name": "Doc2DB",
+      "files": 102,
+      "snapshot": "doc2db/snapshot.json"
+    }
+  ]
+}

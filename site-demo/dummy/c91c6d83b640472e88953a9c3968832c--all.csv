@@ -1,0 +1,10 @@
+﻿candidate,relationship,direction,record_a,record_b,evidence
+P1,PRESCRIPTION_FOR,b_to_a,"{""diagnosis"": ""Insomnia"", ""category"": ""Sleep"", ""status"": ""Active""}","{""drug"": ""Zolpidem"", ""dosage"": ""5"", ""unit"": ""mg"", ""route"": ""Oral""}","Sleep review
+Zolpidem was prescribed to treat insomnia. Confusion developed after zolpidem was administered; the clinician attributed the confusion to zolpidem. Zolpidem treatment for insomnia was discontinued because of confusion. Confusion resolved after zolpidem was withdrawn."
+P3,ASSOCIATED_WITH,b_to_a,"{""diagnosis"": ""Confusion"", ""category"": ""Neurologic"", ""status"": ""New symptom""}","{""drug"": ""Zolpidem"", ""dosage"": ""5"", ""unit"": ""mg"", ""route"": ""Oral""}","Sleep review
+Zolpidem was prescribed to treat insomnia. Confusion developed after zolpidem was administered; the clinician attributed the confusion to zolpidem. Zolpidem treatment for insomnia was discontinued because of confusion. Confusion resolved after zolpidem was withdrawn."
+P4,ASSOCIATED_WITH,b_to_a,"{""diagnosis"": ""Asthma"", ""category"": ""Respiratory"", ""status"": ""Active""}","{""drug"": ""Albuterol"", ""dosage"": ""2"", ""unit"": ""puffs"", ""route"": ""Inhaled""}","Respiratory review
+Asthma was treated with inhaled albuterol. Wheezing improved after albuterol was administered for asthma. Albuterol treatment for asthma was continued."
+P5,TREATS_CONDITION,b_to_a,"{""diagnosis"": ""Type 2 diabetes"", ""category"": ""Metabolic"", ""status"": ""Active""}","{""drug"": ""Metformin"", ""dosage"": ""500"", ""unit"": ""mg"", ""route"": ""Oral""}","Metabolic review
+Metformin was prescribed to treat type 2 diabetes. Nausea developed after metformin was started; the clinician attributed the nausea to metformin. Metformin treatment for type 2 diabetes was discontinued because of the nausea. Nausea resolved after metformin was stopped.
+"
