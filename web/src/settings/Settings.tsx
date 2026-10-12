@@ -1,6 +1,9 @@
+import { effectivePromptSchema, presetSchema, reservedOutcomes } from "./promptSchema";
 import { useEffect, useState } from "react";
+import { KnowledgePrompts } from "./KnowledgePrompts";
 import { api, post } from "../storage/api";
 import { useTheme } from "../theme";
+import { staticWorkspace } from "../mode";
 import "../storage/lakes.css";
 import "./settings.css";
 
@@ -209,6 +212,9 @@ type PromptPreset = {
 };
 
 type LakeConfig = {
+  generic_encoder?: {model:string;revision:string;dimensions:number;token_limit:number;requested_revision?:string} | null;
+  generic_dimensions?: number | null;
+  reranker_id?: string | null;
   version: string;
   revision: string;
   updated: number;
@@ -242,11 +248,14 @@ type LakeConfig = {
     examples: Array<{
       record_a: string;
       record_b: string;
-      relationship: string;
+      relationship?: string;
+      label?: string;
       direction: string;
       passage: string;
-      quote_a: string;
-      quote_b: string;
+      quote_a?: string;
+      quote_b?: string;
+      record_a_quote?: string;
+      record_b_quote?: string;
       reason?: string;
     }>;
   };
@@ -284,9 +293,10 @@ type ResetResult = {
 
 type Props = {
   activeLake?: string;
+  lakeId?: string;
 };
 
-export function Settings({ activeLake }: Props = {}) {
+export function Settings({ activeLake, lakeId }: Props = {}) {
   const { theme, resolvedTheme, setTheme } = useTheme();
   const [activeSection, setActiveSection] = useState<"models" | "prompts" | "context" | "policies">("models");
 
@@ -338,6 +348,10 @@ export function Settings({ activeLake }: Props = {}) {
   // Lake configuration & catalogs
   const [lakeConfig, setLakeConfig] = useState<LakeConfig | null>(null);
   const [draftLakeConfig, setDraftLakeConfig] = useState<LakeConfig | null>(null);
+  const [encoderModel,setEncoderModel]=useState('');
+  const [encoderRevision,setEncoderRevision]=useState('main');
+  const [encoderPreparing,setEncoderPreparing]=useState(false);
+  const [encoderMessage,setEncoderMessage]=useState('');
   const [impactPreview, setImpactPreview] = useState<ImpactPreview | null>(null);
   const [impactLoading, setImpactLoading] = useState(false);
   const [explicitImpactChecked, setExplicitImpactChecked] = useState(false);
@@ -350,11 +364,15 @@ export function Settings({ activeLake }: Props = {}) {
     char_counts?: { system_prompt: number; effective_context: number; total_prompt: number };
   } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [newRelationshipLabel,setNewRelationshipLabel] = useState("");
+  useEffect(() => {
+    setPromptPreview(null);
+  }, [draftLakeConfig?.prompt_id, draftLakeConfig?.schema_config, draftLakeConfig?.context_config]);
 
   // Lake context state
   const [contextStaleness, setContextStaleness] = useState<{ stale: boolean; reason: string } | null>(null);
-  const [contextSample, setContextSample] = useState<{ tables: any[]; text_units: any[]; total_chars: number; budget_chars: number } | null>(null);
-  const [contextSummary, setContextSummary] = useState<{ candidate_domains: string[]; is_mixed_domain: boolean; entity_descriptions: Record<string, string>; suggested_vocabulary: string[] } | null>(null);
+  const [contextSample, setContextSample] = useState<{ tables: {asset_id:string; name:string; rows:unknown[]; sample_count:number}[]; texts: {asset_id:string; name:string; units:string[]; sample_count:number}[]; total_chars: number; budget_chars: number } | null>(null);
+  const [contextSummary, setContextSummary] = useState<{ domain: string; summary:string; entities: {source_name:string; entity_type:string}[]; suggested_vocabulary: string[] } | null>(null);
   const [contextLoading, setContextLoading] = useState(false);
 
   // Example editor draft state
@@ -395,6 +413,8 @@ export function Settings({ activeLake }: Props = {}) {
         if (active && r.config) {
           setLakeConfig(r.config);
           setDraftLakeConfig(JSON.parse(JSON.stringify(r.config)));
+          setEncoderModel(r.config.generic_encoder?.model||'google/embeddinggemma-2');
+          setEncoderRevision(r.config.generic_encoder?.requested_revision||'main');
           if (r.config.bundle_id && r.config.bundle_version) {
             setSelectedBundleVersions((prev) => ({
               ...prev,
@@ -424,7 +444,10 @@ export function Settings({ activeLake }: Props = {}) {
 
     api<{ context_config: any; staleness: any }>("/context")
       .then((r) => {
-        if (active && r.staleness) setContextStaleness(r.staleness);
+        if (active) {
+          if (r.staleness) setContextStaleness({stale:r.staleness.is_stale, reason:r.staleness.reasons.join("; ")});
+          setContextSummary(r.context_config?.sampled_context || null);
+        }
       })
       .catch((e) => console.error("Could not fetch context:", e));
 
@@ -783,6 +806,34 @@ export function Settings({ activeLake }: Props = {}) {
     });
   };
 
+  const chooseProfilingEncoder = async (modelId: string) => {
+    if (!draftLakeConfig || encoderPreparing) return;
+    const models: Record<string, string> = {
+      'embeddinggemma-2': 'google/embeddinggemma-2',
+      'all-minilm': 'sentence-transformers/all-MiniLM-L6-v2',
+      'medembed': 'abhinand/MedEmbed-large-v0.1',
+      'bge-small': 'BAAI/bge-small-en-v1.5',
+    };
+    const model = models[modelId];
+    if (!model) return;
+    setEncoderPreparing(true);
+    setEncoderMessage(`Preparing ${model} and testing synthetic sentences…`);
+    try {
+      const prepared = await post<NonNullable<LakeConfig['generic_encoder']>>('/settings/models/prepare-encoder', {model, revision: 'main'});
+      const next = {...draftLakeConfig, bundle_id: 'generic-adapter-v1', bundle_version: 'v1',
+        generic_encoder: prepared, generic_dimensions: modelId === 'embeddinggemma-2' ? draftLakeConfig.generic_dimensions : null};
+      setDraftLakeConfig(next);
+      setEncoderModel(model);
+      setEncoderRevision('main');
+      checkImpact(next);
+      setEncoderMessage(`Selected ${model} · ${prepared.dimensions} dimensions. Apply encoder to this lake, then rebuild profiling and Discovery.`);
+    } catch (e) {
+      setEncoderMessage(String(e));
+    } finally {
+      setEncoderPreparing(false);
+    }
+  };
+
   const handleTestBundleProbe = async (bundleId: string) => {
     setProbeLoading(true);
     setError("");
@@ -792,6 +843,8 @@ export function Settings({ activeLake }: Props = {}) {
         bundle_id: bundleId,
         device: draft?.device === "cpu" ? "cpu" : "auto",
         version: selectedBundleVersions[bundleId] || undefined,
+        generic_encoder: bundleId==='generic-adapter-v1'?draftLakeConfig?.generic_encoder:undefined,
+        generic_dimensions: bundleId==='generic-adapter-v1'?draftLakeConfig?.generic_dimensions:undefined,
       });
       setModelProbeReport(rep);
       setNotice(`Probe complete for ${rep.name} (${rep.version || "default"}): ${rep.seconds.toFixed(3)}s on ${rep.device_name} (${rep.repeatable ? "deterministic" : "non-deterministic"}).`);
@@ -826,7 +879,7 @@ export function Settings({ activeLake }: Props = {}) {
     try {
       const s = await post<any>("/context/sample", { budget_chars: 3000 });
       setContextSample(s);
-      setNotice(`Sampled ${s.tables.length} tables and ${s.text_units.length} text units (${s.total_chars}/${s.budget_chars} chars).`);
+      setNotice(`Sampled ${s.tables.length} tables and ${s.texts.reduce((n: number, t: {units: string[]}) => n + t.units.length, 0)} text units (${s.total_chars}/${s.budget_chars} chars).`);
     } catch (e) {
       setError(`Sampling failed: ${e}`);
     } finally {
@@ -838,13 +891,14 @@ export function Settings({ activeLake }: Props = {}) {
     setContextLoading(true);
     setError("");
     try {
-      const sum = await post<any>("/context/summarize", { timeout: 20 });
+      const sum = await post<any>("/context/summarize", { config: { provider: "disabled" } });
       setContextSummary(sum);
+      setContextStaleness(null);
       if (draftLakeConfig) {
         const next = { ...draftLakeConfig, context_config: { ...draftLakeConfig.context_config, sampled_context: sum } };
         setDraftLakeConfig(next);
       }
-      setNotice(`Context summarized: ${sum.is_mixed_domain ? "Mixed/Unknown domain detected" : sum.candidate_domains.join(", ")}.`);
+      setNotice(`Context summarized: ${sum.domain}. Select Sampled Context and save to use it.`);
     } catch (e) {
       setError(`Context summarization failed: ${e}`);
     } finally {
@@ -858,7 +912,7 @@ export function Settings({ activeLake }: Props = {}) {
     try {
       const res = await post<any>("/context/examples/validate", newExample);
       if (res.valid) {
-        setExampleValidationNotice("✓ Example verified: grounded in passage, valid direction, no masked identifiers.");
+        setExampleValidationNotice("Example format and supplied quotes checked. Review its relationship meaning before adding it.");
       }
     } catch (e) {
       setError(`Example validation failed: ${e}`);
@@ -887,7 +941,7 @@ export function Settings({ activeLake }: Props = {}) {
         quote_b: "",
         reason: "",
       });
-      setExampleValidationNotice("Example added to active configuration.");
+      setExampleValidationNotice("Example added to the draft. Select User Examples and save to use it.");
     } catch (e) {
       setError(`Cannot add example: ${e}`);
     }
@@ -1006,7 +1060,7 @@ export function Settings({ activeLake }: Props = {}) {
 
       {/* SECTION 1: MODELS & RUNTIME */}
       {activeSection === "models" && (
-        <div className="settings-tab-panel">
+        <fieldset className="settings-tab-panel" disabled={staticWorkspace} style={{border:0,margin:0,padding:0,minWidth:0}}>
           <div className="settings-card">
             <div className="settings-card-title">
               <span>01</span>
@@ -1065,15 +1119,31 @@ export function Settings({ activeLake }: Props = {}) {
                 <span className="hub-step-num">Step 1</span>
                 <div className="hub-step-header-text">
                   <h3>Dataset Profiling & Passage Embeddings</h3>
-                  <p>Dense embedding models used by <code>scripts/embed-profile.py</code> to index CSV tables and text passages into vector storage.</p>
+                  <p>Choose the encoder for this lake’s tables and text. Profiling and generic Discovery share the same embedding model.</p>
                 </div>
               </div>
 
+              {draftLakeConfig && <div className="generic-encoder-settings profiling-selection">
+                <strong>Encoder · {activeLake}</strong>
+                <span>{draftLakeConfig.bundle_id === 'legacy-loki-clinical' ? 'abhinand/MedEmbed-large-v0.1 · trained LOKI' : draftLakeConfig.generic_encoder?.model || 'google/embeddinggemma-2'}</span>
+                <button type="button" disabled={encoderPreparing || (draftLakeConfig.bundle_id === lakeConfig?.bundle_id && JSON.stringify(draftLakeConfig.generic_encoder || null) === JSON.stringify(lakeConfig?.generic_encoder || null) && (draftLakeConfig.generic_dimensions || null) === (lakeConfig?.generic_dimensions || null))} onClick={saveLakeConfigChanges}>Apply encoder to lake</button>
+                <small role="status">{encoderMessage || 'Choose a card, then apply. Changing the encoder requires rebuilding profiling and Discovery; saved runs remain available.'}</small>
+                {draftLakeConfig.bundle_id === 'legacy-loki-clinical' && <small>Trained LOKI requires its original MedEmbed encoder. Choosing another card explicitly selects the generic adapter in Step 3.</small>}
+              </div>}
               <div className="bundle-cards-grid">
                 {(modelsHub?.steps?.step1_profiling?.models || [
                   {
+                    id: "embeddinggemma-2",
+                    name: "EmbeddingGemma-2 (Text only · Default generic encoder)",
+                    dimensions: 768,
+                    token_limit: 262144,
+                    description: "Text-only sentence similarity embeddings, prepared in an isolated runtime.",
+                    ready: false,
+                    size_str: "",
+                  },
+                  {
                     id: "all-minilm",
-                    name: "all-MiniLM-L6-v2 (Domain-Agnostic · Recommended)",
+                    name: "all-MiniLM-L6-v2 (Lightweight alternative)",
                     dimensions: 384,
                     token_limit: 512,
                     description: "Fast 384d embedding model with minimal VRAM/CPU footprint. Ideal for domain-agnostic tabular data.",
@@ -1100,12 +1170,15 @@ export function Settings({ activeLake }: Props = {}) {
                   },
                 ]).map((m) => {
                   const isDownloadingThis = bundleDownloadStatus.status === "downloading" && bundleDownloadStatus.bundle_id === m.id;
+                  const modelIds: Record<string, string> = {'embeddinggemma-2':'google/embeddinggemma-2','all-minilm':'sentence-transformers/all-MiniLM-L6-v2','medembed':'abhinand/MedEmbed-large-v0.1','bge-small':'BAAI/bge-small-en-v1.5'};
+                  const selectedModel = draftLakeConfig?.bundle_id === 'legacy-loki-clinical' ? modelIds.medembed : draftLakeConfig?.generic_encoder?.model || modelIds['embeddinggemma-2'];
+                  const isSelected = selectedModel === modelIds[m.id];
                   return (
-                    <div key={m.id} className={`bundle-card ${m.ready ? "ready-card" : ""}`}>
+                    <div key={m.id} className={`bundle-card ${m.ready ? "ready-card" : ""} ${isSelected ? "selected" : ""}`}>
                       <div className="bundle-card-top">
                         <div>
                           <h4>{m.name}</h4>
-                          <span className="bundle-id">models/step1_profiling/{m.id}</span>
+                          <span className="bundle-id">{modelIds[m.id]}</span>
                         </div>
                         <div className="bundle-badges-row">
                           {m.size_str && (
@@ -1133,6 +1206,9 @@ export function Settings({ activeLake }: Props = {}) {
                       </div>
 
                       <div className="bundle-card-actions">
+                        <button type="button" className="bundle-download-btn" disabled={!draftLakeConfig || encoderPreparing || isSelected || bundleDownloadStatus.status === 'downloading'} onClick={() => chooseProfilingEncoder(m.id)}>
+                          {isSelected ? 'Selected encoder' : draftLakeConfig?.bundle_id === 'legacy-loki-clinical' ? 'Choose with generic adapter' : 'Choose encoder'}
+                        </button>
                         <button
                           type="button"
                           className="bundle-download-btn"
@@ -1169,10 +1245,26 @@ export function Settings({ activeLake }: Props = {}) {
                 <span className="hub-step-num">Step 2</span>
                 <div className="hub-step-header-text">
                   <h3>Candidate Discovery & Reranking</h3>
-                  <p>Cross-encoder neural rerankers for scoring and ranking candidate table-to-text pairs.</p>
+                  <p>Choose the neural reranker used when Integration ranks discovered evidence. LOKI's precomputed Discovery scores are kept.</p>
                 </div>
               </div>
 
+              {draftLakeConfig && <div className="generic-encoder-settings reranker-selection">
+                <label htmlFor="lake-reranker">Reranker · this lake</label>
+                <select id="lake-reranker" value={draftLakeConfig.reranker_id||''} onChange={e=>{
+                  const next={...draftLakeConfig,reranker_id:e.target.value||null};setDraftLakeConfig(next);checkImpact(next);
+                }}>
+                  <option value="">Automatic · existing behavior</option>
+                  <option value="bge-reranker-base">BAAI / BGE reranker base</option>
+                  <option value="gte-reranker-modernbert-base">Alibaba / GTE ModernBERT reranker</option>
+                </select>
+                <button type="button" className="settings-save-btn" disabled={(draftLakeConfig.reranker_id||null)===(lakeConfig?.reranker_id||null)} onClick={()=>action('Applying reranker',async()=>{
+                  const saved=await post<LakeConfig>('/config',{reranker_id:draftLakeConfig.reranker_id||null,expected_revision:lakeConfig?.revision});
+                  setLakeConfig(saved);setDraftLakeConfig(previous=>previous?{...previous,revision:saved.revision,updated:saved.updated,reranker_id:saved.reranker_id}:saved);
+                  setNotice('Reranker saved for this lake. New Integration ranking uses this selection.');
+                })}>Apply reranker</button>
+                <small>Download the selected model below before running Integration. Explicit selections never fall back to another model.</small>
+              </div>}
               <div className="bundle-cards-grid">
                 {(modelsHub?.steps?.step2_discovery?.models || [
                   {
@@ -1189,10 +1281,11 @@ export function Settings({ activeLake }: Props = {}) {
                     ready: false,
                     size_str: "",
                   },
+                  {id:'gte-reranker-modernbert-base',name:'Alibaba-NLP/gte-reranker-modernbert-base',description:'Neural relevance reranking.',ready:false,size_str:''},
                 ]).map((m) => {
                   const isDownloadingThis = bundleDownloadStatus.status === "downloading" && bundleDownloadStatus.bundle_id === m.id;
                   return (
-                    <div key={m.id} className="bundle-card">
+                    <div key={m.id} className={`bundle-card ${draftLakeConfig?.reranker_id===m.id?'selected':''}`}>
                       <div className="bundle-card-top">
                         <div>
                           <h4>{m.name}</h4>
@@ -1214,6 +1307,7 @@ export function Settings({ activeLake }: Props = {}) {
 
                       {!m.builtin && (
                         <div className="bundle-card-actions">
+                          <button type="button" disabled={!draftLakeConfig||!m.ready} onClick={()=>{if(draftLakeConfig){const next={...draftLakeConfig,reranker_id:m.id};setDraftLakeConfig(next);checkImpact(next);}}}>{draftLakeConfig?.reranker_id===m.id?'Selected for this lake':'Choose reranker'}</button>
                           <button
                             type="button"
                             className="bundle-download-btn"
@@ -1251,7 +1345,7 @@ export function Settings({ activeLake }: Props = {}) {
                 <span className="hub-step-num">Step 3</span>
                 <div className="hub-step-header-text">
                   <h3>Relationship Scoring & Cross-Attention Adapters</h3>
-                  <p>Strict tensor contract cross-attention models matching table records to text passages (Lake-Configurable).</p>
+                  <p>Choose a SentenceTransformer encoder for generic scoring, or a trained cross-attention checkpoint with its matching encoder. Selections apply to this lake.</p>
                 </div>
               </div>
 
@@ -1298,9 +1392,27 @@ export function Settings({ activeLake }: Props = {}) {
                     </div>
 
                     <p className="bundle-desc">{b.description}</p>
+                    {b.bundle_id==='generic-adapter-v1' && <div className="bundle-version-select-row" onClick={e=>e.stopPropagation()}>
+                      <div className="generic-encoder-settings">
+                        <label htmlFor="generic-encoder-model">SentenceTransformer encoder · this lake</label>
+                        <input id="generic-encoder-model" value={encoderModel} placeholder={draftLakeConfig?.generic_encoder?.model||b.retrieval_encoder} onChange={e=>{setEncoderModel(e.target.value);setEncoderMessage('');}}/>
+                        <label htmlFor="generic-encoder-revision">Hugging Face revision (branch, tag or commit)</label>
+                        <input id="generic-encoder-revision" value={encoderRevision} onChange={e=>{setEncoderRevision(e.target.value);setEncoderMessage('');}}/>
+                        <p>Default: EmbeddingGemma-2 · text only. The main revision is resolved when you prepare the model; the exact commit is recorded with your results. Other compatible SentenceTransformer encoders use your selected Python environment. Apply to activate for this lake. Generic scoring uses normalized cosine similarity; trained LOKI keeps its original encoder.</p>
+                        <button type="button" disabled={encoderPreparing||!encoderModel.trim()} onClick={async()=>{
+                          setEncoderPreparing(true);setEncoderMessage('Downloading and testing synthetic sentences…');
+                          try {const prepared=await post<NonNullable<LakeConfig['generic_encoder']>>('/settings/models/prepare-encoder',{model:encoderModel.trim(),revision:encoderRevision});
+                            if(draftLakeConfig){const next={...draftLakeConfig,bundle_id:'generic-adapter-v1',generic_encoder:prepared,generic_dimensions:prepared.model==='google/embeddinggemma-2'?draftLakeConfig.generic_dimensions:null};setDraftLakeConfig(next);checkImpact(next);}
+                            setEncoderMessage(`Prepared ${prepared.model} · ${prepared.dimensions} dimensions · pinned ${prepared.revision.slice(0,12)}. Apply to activate.`);
+                          }catch(e){setEncoderMessage(String(e));}finally{setEncoderPreparing(false);}
+                        }}>{encoderPreparing?'Preparing encoder…':'Prepare encoder'}</button>
+                        <button type="button" disabled={encoderPreparing||!draftLakeConfig?.generic_encoder} onClick={()=>{if(draftLakeConfig){const next={...draftLakeConfig,generic_encoder:null};setDraftLakeConfig(next);setEncoderModel('google/embeddinggemma-2');setEncoderRevision('main');checkImpact(next);setEncoderMessage('EmbeddingGemma-2 text-only default selected. Apply to activate.');}}}>Use default encoder</button>
+                        <small role="status">{encoderMessage|| (draftLakeConfig?.generic_encoder?`${draftLakeConfig.generic_encoder.model} · ${draftLakeConfig.generic_encoder.dimensions} dimensions · ${draftLakeConfig.generic_encoder.revision.slice(0,12)}`:'Default encoder selected')}</small>
+                      </div>
+                    </div>}
 
                     {/* Version / Checkpoint Selection */}
-                    {versionsList.length > 0 && (
+                    {versionsList.length > 0 && b.bundle_id!=='generic-adapter-v1' && (
                       <div className="bundle-version-select-row" onClick={(e) => e.stopPropagation()}>
                         <label htmlFor={`version-${b.bundle_id}`}>
                           <strong>Checkpoint / Version:</strong>
@@ -1324,26 +1436,39 @@ export function Settings({ activeLake }: Props = {}) {
                       </div>
                     )}
 
+                    {b.bundle_id==='generic-adapter-v1' && <div className="bundle-version-select-row" onClick={e=>e.stopPropagation()}>
+                      <div className="generic-encoder-settings">
+                        <label htmlFor="generic-embedding-dimensions">Embedding dimensions · this lake</label>
+                        {(draftLakeConfig?.generic_encoder?.model||b.retrieval_encoder)==='google/embeddinggemma-2' ? <>
+                          <select id="generic-embedding-dimensions" value={draftLakeConfig?.generic_dimensions||768} onChange={e=>{if(draftLakeConfig){const next={...draftLakeConfig,generic_dimensions:Number(e.target.value)};setDraftLakeConfig(next);checkImpact(next);}}}>
+                            <option value={768}>768 · full embeddings</option><option value={512}>512 · smaller index</option><option value={256}>256 · compact index</option><option value={128}>128 · smallest index</option>
+                          </select>
+                          <small>Smaller vectors reduce index storage and search costs. Apply, then rebuild profiling and Discovery.</small>
+                        </> : <small id="generic-embedding-dimensions">Native dimensions: {draftLakeConfig?.generic_encoder?.dimensions||b.dimensions}. This encoder's size is fixed.</small>}
+                      </div>
+                    </div>}
+
                     <div className="bundle-roles-grid">
                       <div>
                         <small>Retrieval Encoder</small>
-                        <code>{b.retrieval_encoder}</code>
+                        <code>{b.bundle_id==='generic-adapter-v1'?(draftLakeConfig?.generic_encoder?.model||b.retrieval_encoder):b.retrieval_encoder}</code>
                       </div>
                       <div>
                         <small>Scoring Model</small>
-                        <code>{b.scoring_model}</code>
+                        <code>{b.bundle_id==='generic-adapter-v1'?'Normalized cosine similarity':b.scoring_model}</code>
                       </div>
                       <div>
                         <small>Reranker</small>
-                        <code>{b.reranker}</code>
+                        <code>{draftLakeConfig?.reranker_id==='bge-reranker-base'?'BAAI/bge-reranker-base':draftLakeConfig?.reranker_id==='gte-reranker-modernbert-base'?'Alibaba-NLP/gte-reranker-modernbert-base':'Automatic · configured in Step 2'}</code>
                       </div>
                       <div>
                         <small>Dimensions & Adapter</small>
-                        <code>{b.dimensions}d · {b.adapter_id}</code>
+                        <code>{b.bundle_id==='generic-adapter-v1'?(draftLakeConfig?.generic_dimensions||draftLakeConfig?.generic_encoder?.dimensions||b.dimensions):b.dimensions}d · {b.adapter_id}</code>
                       </div>
                     </div>
 
                     <div className="bundle-card-actions" onClick={(e) => e.stopPropagation()}>
+                      {b.bundle_id!=='generic-adapter-v1'&&<>
                       <button
                         type="button"
                         className="bundle-download-btn"
@@ -1369,6 +1494,7 @@ export function Settings({ activeLake }: Props = {}) {
                           🗑 Delete
                         </button>
                       )}
+                      </>}
 
                       <button
                         type="button"
@@ -1437,7 +1563,7 @@ export function Settings({ activeLake }: Props = {}) {
               <button
                 type="button"
                 className="settings-save-btn"
-                disabled={draftLakeConfig?.bundle_id === lakeConfig?.bundle_id}
+                disabled={encoderPreparing || (draftLakeConfig?.bundle_id === lakeConfig?.bundle_id && (draftLakeConfig?.generic_dimensions||null)===(lakeConfig?.generic_dimensions||null) && (draftLakeConfig?.reranker_id||null)===(lakeConfig?.reranker_id||null) && JSON.stringify(draftLakeConfig?.generic_encoder||null)===JSON.stringify(lakeConfig?.generic_encoder||null) && selectedBundleVersions[draftLakeConfig?.bundle_id||'']===lakeConfig?.bundle_version)}
                 onClick={saveLakeConfigChanges}
               >
                 Apply Model Bundle to Lake
@@ -2052,7 +2178,7 @@ export function Settings({ activeLake }: Props = {}) {
               </div>
             </div>
           )}
-        </div>
+        </fieldset>
       )}
 
       {/* SECTION 2: PROMPTS & EXAMPLES */}
@@ -2083,12 +2209,7 @@ export function Settings({ activeLake }: Props = {}) {
                     const next = {
                       ...draftLakeConfig,
                       prompt_id: pid,
-                      schema_config: {
-                        prompt_id: pid,
-                        mode: preset.mode,
-                        labels: [...preset.labels],
-                        definitions: { ...preset.definitions },
-                      },
+                      schema_config: presetSchema(pid, preset),
                     };
                     setDraftLakeConfig(next);
                     checkImpact(next);
@@ -2110,10 +2231,10 @@ export function Settings({ activeLake }: Props = {}) {
                   const m = e.target.value as "strict" | "hybrid" | "open";
                   setDraftLakeConfig({
                     ...draftLakeConfig,
-                    schema_config: {
-                      ...draftLakeConfig.schema_config,
-                      mode: m,
-                    },
+                    schema_config: m === "open" ? effectivePromptSchema({...draftLakeConfig.schema_config,mode:m})
+                      : draftLakeConfig.prompt_id === "clinical-preset-v1" && draftLakeConfig.schema_config.mode === "open"
+                        ? presetSchema(draftLakeConfig.prompt_id,promptsCatalog[draftLakeConfig.prompt_id],m)
+                        : {...draftLakeConfig.schema_config,mode:m},
                   });
                 }}
               >
@@ -2124,10 +2245,17 @@ export function Settings({ activeLake }: Props = {}) {
             </label>
 
             {/* Label Definitions Editor */}
-            <div className="schema-labels-editor">
+            {draftLakeConfig.schema_config.mode === "open" ? <div className="schema-labels-editor"><h4>No predefined relationship labels</h4><p>Open mode derives relationship names from your records and evidence. NEGATIVE and UNRESOLVED are reserved outcomes, not relationship suggestions.</p></div> : <div className="schema-labels-editor">
               <h4>Relationship Labels & Definitions</h4>
+              <label>New relationship label
+                <input type="text" value={newRelationshipLabel} placeholder="UPPER_SNAKE_CASE" onChange={e=>setNewRelationshipLabel(e.target.value.toUpperCase().replace(/[\s-]+/g,"_"))}/>
+              </label>
+              <button type="button" className="secondary" disabled={!/^[A-Z0-9_]{2,64}$/.test(newRelationshipLabel) || draftLakeConfig.schema_config.labels.includes(newRelationshipLabel)} onClick={()=>{
+                setDraftLakeConfig({...draftLakeConfig,schema_config:{...draftLakeConfig.schema_config,labels:[...draftLakeConfig.schema_config.labels,newRelationshipLabel]}});setNewRelationshipLabel("");
+              }}>Add relationship label</button>
+              {!draftLakeConfig.schema_config.labels.some(l=>!reservedOutcomes.includes(l)) && <p>No relationship vocabulary is predefined for this preset. Add your own labels, use Relationship Probing, or select Open mode.</p>}
               <div className="labels-list">
-                {draftLakeConfig.schema_config.labels.map((lbl) => (
+                {draftLakeConfig.schema_config.labels.filter(lbl=>!reservedOutcomes.includes(lbl)).map((lbl) => (
                   <div key={lbl} className="label-def-row">
                     <span className="label-name-badge">{lbl}</span>
                     <input
@@ -2146,7 +2274,7 @@ export function Settings({ activeLake }: Props = {}) {
                   </div>
                 ))}
               </div>
-            </div>
+            </div>}
 
             {/* Prompt Preview Controls */}
             <div className="prompt-preview-controls">
@@ -2187,14 +2315,9 @@ export function Settings({ activeLake }: Props = {}) {
                   if (defaultPreset) {
                     setDraftLakeConfig({
                       ...draftLakeConfig,
-                      schema_config: {
-                        prompt_id: draftLakeConfig.prompt_id,
-                        mode: defaultPreset.mode,
-                        labels: [...defaultPreset.labels],
-                        definitions: { ...defaultPreset.definitions },
-                      },
+                      schema_config: presetSchema(draftLakeConfig.prompt_id,defaultPreset,draftLakeConfig.schema_config.mode),
                     });
-                    setNotice("Restored preset default schema definitions.");
+                    setNotice("Restored defaults for the current preset and extraction mode.");
                   }
                 }}
               >
@@ -2205,6 +2328,7 @@ export function Settings({ activeLake }: Props = {}) {
               </button>
             </div>
           </div>
+          {lakeId && <KnowledgePrompts key={lakeId} lakeId={lakeId}/>}
         </div>
       )}
 
@@ -2254,6 +2378,14 @@ export function Settings({ activeLake }: Props = {}) {
             </label>
 
             {/* Sampling and Heuristic Summarization Controls */}
+            <div className="settings-inline-note">
+              <p><strong>None:</strong> start here for a known domain or an existing preset. Each candidate still includes its records and evidence.</p>
+              <p><strong>Sampled Context:</strong> use for an unfamiliar lake. Generate and inspect the summary, then save. It is a heuristic hint, not a discovered relationship or a filter.</p>
+              <p><strong>User Examples:</strong> use when you have checked examples that demonstrate a difficult relationship or direction. Add a few concise examples, then save. This mode uses examples instead of the sampled summary.</p>
+              <p>These settings guide Integration's LLM prompts. They do not train models or change LOKI's numerical scores. Changes below are drafts until saved.</p>
+              {draftLakeConfig.context_config.mode === 'sampled_context' && !draftLakeConfig.context_config.sampled_context && <p role="status">No summary is available yet. Generate a summary before saving this mode.</p>}
+              {draftLakeConfig.context_config.mode === 'user_examples' && !draftLakeConfig.context_config.examples.length && <p role="status">No examples are available yet. Add an example before saving this mode.</p>}
+            </div>
             <div className="context-tools-row">
               <button
                 type="button"
@@ -2277,13 +2409,13 @@ export function Settings({ activeLake }: Props = {}) {
             {contextSample && (
               <div className="context-sample-card">
                 <h4>Sampled Content ({contextSample.total_chars} / {contextSample.budget_chars} chars)</h4>
-                <p>Sampled {contextSample.tables.length} tables and {contextSample.text_units.length} text units with reproducible source diversity.</p>
+                <p>Sampled {contextSample.tables.length} tables and {contextSample.texts.reduce((n, t) => n + t.units.length, 0)} text units with reproducible source diversity.</p>
                 <div className="sample-sources-chips">
                   {contextSample.tables.map((t) => (
-                    <span key={t.asset_id} className="sample-chip">📊 {t.name} ({t.rows} rows)</span>
+                    <span key={t.asset_id} className="sample-chip">📊 {t.name} ({t.rows.length} rows)</span>
                   ))}
-                  {contextSample.text_units.map((t) => (
-                    <span key={t.asset_id} className="sample-chip">📄 {t.name} ({t.length} chars)</span>
+                  {contextSample.texts.map((t) => (
+                    <span key={t.asset_id} className="sample-chip">📄 {t.name} ({t.units.join("").length} chars)</span>
                   ))}
                 </div>
               </div>
@@ -2294,8 +2426,9 @@ export function Settings({ activeLake }: Props = {}) {
               <div className="context-summary-card">
                 <h4>Pre-Discovery Heuristic Summary</h4>
                 <p>
-                  Domain: <strong>{contextSummary.is_mixed_domain ? "Mixed / Unknown Domain" : contextSummary.candidate_domains.join(", ") || "General"}</strong>
+                  Domain: <strong>{contextSummary.domain || "General"}</strong>
                 </p>
+                <p>{contextSummary.summary}</p>
                 {contextSummary.suggested_vocabulary.length > 0 && (
                   <div>
                     <small>Suggested Vocabulary Hints:</small>
@@ -2313,7 +2446,7 @@ export function Settings({ activeLake }: Props = {}) {
             <div className="examples-manager-section">
               <h4>Few-Shot Examples ({draftLakeConfig.context_config.examples.length})</h4>
               <p className="examples-help">
-                Examples provide concrete relationship demonstrations. Quotes must match passage text exactly, and excluded identifiers are rejected.
+                Examples provide concrete relationship demonstrations. The first three active examples are used within the prompt's context budget. Keep them concise and review their meaning; quote checks alone do not verify a relationship.
               </p>
 
               {draftLakeConfig.context_config.examples.map((ex, idx) => (
@@ -2321,7 +2454,7 @@ export function Settings({ activeLake }: Props = {}) {
                   <div className="example-item-header">
                     <div>
                       <strong>{ex.record_a}</strong> ↔ <strong>{ex.record_b}</strong>
-                      <span className="example-rel-badge">{ex.relationship} ({ex.direction})</span>
+                      <span className="example-rel-badge">{ex.label || ex.relationship} ({ex.direction})</span>
                     </div>
                     <button
                       type="button"
@@ -2333,7 +2466,7 @@ export function Settings({ activeLake }: Props = {}) {
                   </div>
                   <blockquote className="example-passage">{ex.passage}</blockquote>
                   <small className="example-quotes">
-                    A quote: <em>"{ex.quote_a}"</em> · B quote: <em>"{ex.quote_b}"</em>
+                    A quote: <em>"{ex.record_a_quote || ex.quote_a}"</em> · B quote: <em>"{ex.record_b_quote || ex.quote_b}"</em>
                   </small>
                 </div>
               ))}
@@ -2433,10 +2566,16 @@ export function Settings({ activeLake }: Props = {}) {
             </div>
 
             <div className="settings-card-actions-bar">
-              <button type="button" className="settings-save-btn" onClick={saveLakeConfigChanges}>
+              <button type="button" className="secondary" disabled={previewLoading} onClick={handlePreviewPrompt}>
+                Preview prompt with draft context
+              </button>
+              <button type="button" className="settings-save-btn" disabled={contextLoading ||
+                (draftLakeConfig.context_config.mode === 'sampled_context' && !draftLakeConfig.context_config.sampled_context) ||
+                (draftLakeConfig.context_config.mode === 'user_examples' && !draftLakeConfig.context_config.examples.length)} onClick={saveLakeConfigChanges}>
                 Save Context Configuration to Lake
               </button>
             </div>
+            {promptPreview && <details className="context-summary-card"><summary>Prompt preview · current draft</summary><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{promptPreview.system_prompt}</pre></details>}
           </div>
         </div>
       )}
@@ -2552,20 +2691,10 @@ export function Settings({ activeLake }: Props = {}) {
               <label className="hf-checkbox-label" style={{ marginTop: "12px" }}>
                 <input
                   type="checkbox"
-                  checked={draftLakeConfig.candidate_policy.allow_same_table}
-                  onChange={(e) => {
-                    const next = {
-                      ...draftLakeConfig,
-                      candidate_policy: {
-                        ...draftLakeConfig.candidate_policy,
-                        allow_same_table: e.target.checked,
-                      },
-                    };
-                    setDraftLakeConfig(next);
-                    checkImpact(next);
-                  }}
+                  checked={false}
+                  disabled
                 />
-                <span>Allow same-table relationship candidates (default: cross-table only)</span>
+                <span>Same-table joins are excluded. Integration connects rows from different source tables.</span>
               </label>
             </div>
 
@@ -2849,3 +2978,4 @@ export function Settings({ activeLake }: Props = {}) {
     </section>
   );
 }
+

@@ -7,7 +7,7 @@ const input = path.join(root, 'site-demo');
 const output = path.join(root, '.idun/showcase-build');
 const manifest = JSON.parse(fs.readFileSync(path.join(input, 'publication.json'), 'utf8'));
 if (manifest.approved !== true || manifest.origin !== 'reviewed-public-datasets' || !manifest.files?.['lakes.json']) throw Error('Approved public lake manifest required');
-const allowed = /^(lakes\.json|(?:dummy|doc2db)\/(?:snapshot\.json|[a-f0-9]{32}--(?:all|[A-Z0-9_]+)\.csv|links\/(?:page-\d+|source-[a-f0-9-]+)\.json\.gz|evidence\/[a-f0-9]{2}\.json\.gz))$/;
+const allowed = /^(lakes\.json|runtime\.zip|(?:dummy|doc2db|disease-az)\/(?:workspace\.json|workspace\.sqlite3\.gz|workspace\.part-\d+\.bin))$/;
 for (const [name, sha] of Object.entries(manifest.files)) {
   if (!allowed.test(name) || !/^[a-f0-9]{64}$/.test(sha)) throw Error('Unexpected publication file: '+name);
   const source = path.resolve(input, name);
@@ -23,4 +23,7 @@ for (const name of Object.keys(manifest.files)) {
 }
 fs.renameSync(path.join(output,'showcase.html'),path.join(output,'index.html'));
 fs.writeFileSync(path.join(output,'.nojekyll'),'');
-console.log('Approved Dummy and Doc2DB results packaged for GitHub Pages.');
+const runtime=path.join(output,'runtime');fs.mkdirSync(runtime,{recursive:true});
+const pyodide=path.dirname(require.resolve('pyodide/package.json'));
+for(const file of ['pyodide.mjs','pyodide.asm.mjs','pyodide.asm.wasm','python_stdlib.zip','pyodide-lock.json'])fs.copyFileSync(path.join(pyodide,file),path.join(runtime,file));
+console.log('Approved Dummy, Doc2DB and Disease A–Z workspaces packaged for GitHub Pages.');

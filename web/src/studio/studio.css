@@ -1096,6 +1096,11 @@ body {
 }
 
 /* Header Action Buttons (Theme Toggle, Settings, Logout) */
+/* Keep the full workflow and right-hand controls reachable with the KG tab. */
+@media (min-width: 881px) and (max-width: 1600px) {
+  .studio-app .sidebar { flex-wrap: wrap; gap: 10px 18px; }
+  .studio-app .sidebar nav { order: 3; flex-basis: 100%; justify-content: flex-start; }
+}
 .studio-header-actions {
   display: flex;
   align-items: center;

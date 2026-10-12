@@ -1,12 +1,13 @@
 import { LakeSelector, LakeWorkspace, type Lake } from "./storage/LakeWorkspace";
 import { publicFile } from "./showcase/paths";
+import {JourneyNavigation,type JourneyVisit,type JourneyStage} from './journey/Navigation';
 import { IntegratedDatasets } from "./integration/IntegratedDatasets";
+import { AugmentationWorkspace } from "./augmentation/AugmentationWorkspace";
 import { Settings } from "./settings/Settings";
-import { publicDemo, savedDemo } from "./mode";
+import { publicDemo, savedDemo, staticWorkspace, inferenceUnavailable } from "./mode";
 import { LiveDiscovery, LiveEvidence } from "./discovery/LiveDiscovery";
-import { LakeProfile } from "./inference/LakeProfile";
-import { InferenceReadiness } from "./inference/Readiness";
-import React, { useEffect, useRef, useState } from "react";
+import { DataLakeWorkflow } from "./storage/DataLakeWorkflow";
+import React, { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import "./intake/intake.css";
@@ -16,33 +17,36 @@ import {
   folderSelection,
   type FolderCollection,
 } from "./intake/folders";
-import { Workbench } from "./evidence/Workbench";
-import type { WorkbenchView } from "./evidence/example";
-import { Discovery } from "./discovery/Discovery";
 import { IntakeReview } from "./intake/IntakeReview";
 
+import "./evidence/workbench.css";
+import "./discovery/discovery.css";
 import "./theme.css";
 import "./studio/studio.css";
 import "./dark.css";
 import { useTheme } from "./theme";
 import { LakeScene } from "./studio/LakeScene";
-import { Augmentation, History } from "./augmentation/Review";
+import "./augmentation/review.css";
 import { SavedLake } from "./storage/SavedLake";
-import type { HistoryEvent } from "./augmentation/model";
+
+const KnowledgeGraph = lazy(() => import('./knowledge/AutomaticKnowledge').then(module => ({default: module.KnowledgeGraph})));
+if(staticWorkspace)void import('./showcase/browser').then(m=>m.installBrowserDownloads());
 
 type Page =
   | "Data Lake"
   | "Discover"
   | "Evidence"
   | "Integration"
-  | "Activity"
+  | "Augmentation"
+  | "Knowledge Graph"
   | "Settings";
 const pages: Page[] = [
   "Data Lake",
   "Discover",
   "Evidence",
   "Integration",
-  "Activity",
+  "Augmentation",
+  "Knowledge Graph",
   "Settings",
 ];
 function Icon({ name, size = 20 }: { name: string; size?: number }) {
@@ -145,10 +149,14 @@ function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) =
     companionId?: string;
   }>();
   const [page, setPage] = useState<Page>("Data Lake");
+  const [journeyVisit,setJourneyVisit]=useState<JourneyVisit>();
+  const journeySequence=useRef(0);
+  function visitJourney(stage:JourneyStage){
+    setPage(stage==='Discovery'?'Discover':stage);
+    setJourneyVisit({stage,token:++journeySequence.current});
+  }
   const intake = useIntake();
   const [savedCount, setSavedCount] = useState(0);
-  const [withdrawn, setWithdrawn] = useState<string[]>([]);
-  const [history, setHistory] = useState<HistoryEvent[]>([]);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [shuttingDown, setShuttingDown] = useState(false);
   const [shutdownError, setShutdownError] = useState("");
@@ -182,29 +190,6 @@ function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) =
       setShuttingDown(false);
     }
   }
-  function applyWithdrawal(ids: string[]) {
-    const restored = withdrawn.filter((id) => !ids.includes(id));
-    const removed = ids.filter((id) => !withdrawn.includes(id));
-    setWithdrawn(ids);
-    setHistory((events) => [
-      ...events,
-      {
-        id: events.length + 1,
-        kind: "Example re-evaluation",
-        message: [
-          removed.length ? `Withheld ${removed.join(", ")}.` : "",
-          restored.length ? `Restored ${restored.join(", ")}.` : "",
-          "Support recalculated from synthetic passages; original values preserved.",
-        ]
-          .filter(Boolean)
-          .join(" "),
-        withdrawn: [...ids],
-      },
-    ]);
-  }
-  const [discoveryExample, setDiscoveryExample] = useState(false);
-  const [workbenchView, setWorkbenchView] =
-    useState<WorkbenchView>("treatments");
   const queue = intake.assets;
   const [dragging, setDragging] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -224,7 +209,7 @@ function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) =
     );
   }
   function dropFiles(data: DataTransfer) {
-    if (collecting || savedDemo) return;
+    if (collecting || inferenceUnavailable) return;
     const controller = new AbortController();
     collection.current = controller;
     setCollecting(true);
@@ -285,6 +270,7 @@ function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) =
     );
   }
   return (
+    <JourneyNavigation lakeId={lake?.id||'public'} lakeName={lake?.name||'Your workspace'} visit={journeyVisit} navigate={visitJourney} consume={token=>setJourneyVisit(current=>current?.token===token?undefined:current)}>
     <div
       className={`app studio-app page-${page.toLowerCase().replace(" ", "-")} ${savedCount ? "has-saved" : ""}`}
     >
@@ -335,7 +321,8 @@ function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) =
                       "discover",
                       "evidence",
                       "datasets",
-                      "activity",
+                      "leaf",
+                      "evidence",
                       "settings",
                     ][i]
                   }
@@ -350,7 +337,7 @@ function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) =
         <div className="studio-header-actions">
           {lake && onLakeChange && <LakeSelector lake={lake} onChange={onLakeChange} blocked={queue.some(a => a.transfer !== "uploaded")} />}
           <div className="studio-session">
-            <span className="session-line session-status"><i /> {publicDemo ? "YOUR DEMO" : "LOCAL"}</span>
+            <span className="session-line session-status"><i /> {staticWorkspace ? "BROWSER" : publicDemo ? "YOUR DEMO" : "LOCAL"}</span>
             <span className="session-line session-title">WORKSPACE</span>
           </div>
           <button
@@ -398,14 +385,13 @@ function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) =
               04 <span>/</span> Evidence workbench
             </span>
           </div>
-          {page === "Data Lake" ? (
-            <>
+          <div style={{display: page === "Data Lake" ? undefined : "none"}}>
+            <DataLakeWorkflow lakeId={lake?.id || 'public'} lakeName={lake?.name || 'Your workspace'} savedCount={savedCount} queuedCount={queue.length} onDiscover={() => setPage('Discover')}>
               <LakeScene
                 lakeName={lake?.name}
                 count={queue.length}
                 savedCount={savedCount}
                 onExplore={() => {
-                  setDiscoveryExample(true);
                   setPage("Discover");
                 }}
               />
@@ -448,14 +434,14 @@ function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) =
                   <div className="intake-pickers">
                     <button
                       className="primary"
-                      disabled={collecting || savedDemo}
+                      disabled={collecting || inferenceUnavailable}
                       onClick={() => folderInput.current?.click()}
                     >
                       Choose folders <Icon name="arrow" size={17} />
                     </button>
                     <button
                       className="secondary"
-                      disabled={collecting || savedDemo}
+                      disabled={collecting || inferenceUnavailable}
                       onClick={() => input.current?.click()}
                     >
                       Choose files
@@ -517,32 +503,18 @@ function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) =
               </section>
               {queue.length > 0 && <IntakeReview intake={intake} lakeName={lake?.name} />}
               <SavedLake onCount={setSavedCount} />
-              <LakeProfile />
-              {!savedDemo && <InferenceReadiness />}
-            </>
-          ) : page === "Discover" ? (
+            </DataLakeWorkflow>
+          </div>
+          {page === "Data Lake" ? null : page === "Discover" ? (
             <>
               <LiveDiscovery
+                onIntegration={() => setPage("Integration")}
                 onIntake={() => setPage("Data Lake")}
                 onOpenEvidence={(linkId, companionId) => {
                   setLiveEvidence({ linkId, companionId });
                   setPage("Evidence");
                 }}
               />
-              <details>
-                <summary>Interface example · synthetic data</summary>
-                <Discovery
-                  example={discoveryExample}
-                  onExampleChange={setDiscoveryExample}
-                  fileCount={queue.length}
-                  onIntake={() => setPage("Data Lake")}
-                  onOpenEvidence={(id) => {
-                    setLiveEvidence(undefined);
-                    setWorkbenchView(id as WorkbenchView);
-                    setPage("Evidence");
-                  }}
-                />
-              </details>
             </>
           ) : page === "Evidence" ? (
             <>
@@ -551,20 +523,9 @@ function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) =
                 companionId={liveEvidence?.companionId}
                 onBack={() => setPage("Discover")}
               />
-              <details>
-                <summary>Interface example · synthetic data</summary>
-                <Workbench
-                  view={workbenchView}
-                  onViewChange={setWorkbenchView}
-                  onDiscover={() => {
-                    setDiscoveryExample(true);
-                    setPage("Discover");
-                  }}
-                />
-              </details>
             </>
           ) : page === "Settings" ? (
-            <Settings activeLake={lake?.name || lake?.id} />
+            <Settings activeLake={lake?.name || lake?.id} lakeId={lake?.id} />
           ) : page === "Integration" ? (
             <>
               <IntegratedDatasets
@@ -575,21 +536,19 @@ function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) =
                   setPage("Evidence");
                 }}
               />
-              <details>
-                <summary>Augmentation example · synthetic data</summary>
-                <Augmentation
-                  withdrawn={withdrawn}
-                  onApply={applyWithdrawal}
-                  onHistory={() => setPage("Activity")}
-                />
-              </details>
             </>
-          ) : (
-            <History events={history} onReview={() => setPage("Integration")} />
-          )}
+          ) : page === "Knowledge Graph" ? (
+            <Suspense fallback={<p role="status">Opening Knowledge Graph…</p>}>
+              <KnowledgeGraph key={lake?.id || 'public'} lakeId={lake?.id || 'public'} lakeName={lake?.name || 'Your workspace'} />
+            </Suspense>
+          ) : null}
+
+          {/* Augmentation stays mounted to preserve results across tab switches */}
+          <div style={{ display: page === "Augmentation" ? undefined : "none" }}>
+            <AugmentationWorkspace />
+          </div>
           <footer>
             <span>IDUN / Integrating Data-lake of Unstructured Nature</span>
-            <span>Research workspace</span>
           </footer>
         </main>
       </div>
@@ -655,6 +614,7 @@ function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) =
         </div>
       )}
     </div>
+    </JourneyNavigation>
   );
 }
 createRoot(document.getElementById("root")!).render(

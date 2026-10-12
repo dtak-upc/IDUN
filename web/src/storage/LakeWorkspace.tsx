@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { api, post, selectApiLake } from "./api";
-import { publicDemo } from "../mode";
+import { publicDemo, staticWorkspace } from "../mode";
 import "./lakes.css";
 
 export type Lake = {id: string; name: string; files?: number};
@@ -108,7 +108,7 @@ export function LakeSelector({lake, onChange, blocked}: {lake: Lake; onChange: (
         <button
           type="button"
           className="lake-btn lake-btn-new"
-          disabled={blocked || busy}
+          disabled={blocked || busy || staticWorkspace}
           aria-label="New lake"
           title="Create new lake"
           onClick={() => { setName(""); setEditing("new"); setMenuOpen(false); }}
@@ -123,7 +123,7 @@ export function LakeSelector({lake, onChange, blocked}: {lake: Lake; onChange: (
         <button
           type="button"
           className={`lake-btn lake-btn-menu ${menuOpen ? "active" : ""}`}
-          disabled={busy}
+          disabled={busy || staticWorkspace}
           aria-label="Lake actions"
           aria-haspopup="true"
           aria-expanded={menuOpen}
@@ -166,7 +166,7 @@ export function LakeSelector({lake, onChange, blocked}: {lake: Lake; onChange: (
             type="button"
             role="menuitem"
             className="lake-dropdown-item lake-dropdown-danger"
-            disabled={blocked || busy}
+            disabled={blocked || busy || staticWorkspace}
             aria-label="Remove data lake"
             onClick={async () => {
               setMenuOpen(false);
@@ -227,7 +227,7 @@ export function LakeSelector({lake, onChange, blocked}: {lake: Lake; onChange: (
                 />
               </div>
               <div className="lake-modal-footer">
-                <button type="button" className="lake-modal-btn-cancel" disabled={busy} onClick={() => setEditing(undefined)}>
+                <button type="button" className="lake-modal-btn-cancel" disabled={busy || staticWorkspace} onClick={() => setEditing(undefined)}>
                   Cancel
                 </button>
                 <button type="submit" className="lake-modal-btn-primary" disabled={busy || !name.trim()}>
@@ -281,7 +281,7 @@ export function LakeSelector({lake, onChange, blocked}: {lake: Lake; onChange: (
                 />
               </div>
               <div className="lake-modal-footer">
-                <button type="button" className="lake-modal-btn-cancel" disabled={busy} onClick={() => setRemoval(undefined)}>
+                <button type="button" className="lake-modal-btn-cancel" disabled={busy || staticWorkspace} onClick={() => setRemoval(undefined)}>
                   Keep lake
                 </button>
                 <button type="submit" className="lake-modal-btn-danger" disabled={busy || confirmName !== removal.name}>

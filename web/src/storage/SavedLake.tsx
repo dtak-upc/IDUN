@@ -1,5 +1,5 @@
 import { apiUrl } from "./api";
-import { savedDemo } from "../mode";
+import { savedDemo, staticWorkspace } from "../mode";
 import { ModelInputPreview } from "../inference/Readiness";
 import { useEffect, useState } from "react";
 import { api, post, type Job } from "./api";
@@ -162,12 +162,12 @@ export function SavedLake({ onCount }: { onCount: (count: number) => void }) {
       <div className="saved-heading">
         <div>
           <h2>
-            Saved data lake <span>{catalog?.total ?? "—"} files</span>
+            Saved Data Lake <span>{catalog?.total ?? "—"} files</span>
           </h2>
           <p>{savedDemo ? "Synthetic source records" : "Original bytes on this machine · No discovery inference has run"}</p>
         </div>
         <button className="secondary" onClick={() => setRevision((r) => r + 1)}>
-          Refresh saved files
+          Refresh Saved Files
         </button>
       </div>
       {error ? (
@@ -239,14 +239,14 @@ export function SavedLake({ onCount }: { onCount: (count: number) => void }) {
             </label>
             <button
               className="remove-saved"
-              disabled={savedDemo || !checked.length || removing}
+              disabled={savedDemo || staticWorkspace || !checked.length || removing}
               onClick={() => previewRemoval({ asset_ids: checked })}
             >
               Remove selected ({checked.length})
             </button>
             <button
               className="remove-saved"
-              disabled={savedDemo || !dataset || removing}
+              disabled={savedDemo || staticWorkspace || !dataset || removing}
               onClick={() => previewRemoval({ dataset_id: dataset })}
             >
               Remove entire dataset
@@ -373,7 +373,7 @@ export function SavedLake({ onCount }: { onCount: (count: number) => void }) {
                 <>
                   <div className="saved-preview-heading">
                     <h3>{selected.name}</h3>
-                    {!savedDemo && <a
+                    {!savedDemo && !staticWorkspace && <a
                       href={apiUrl(`/assets/${selected.asset_id}/raw`)}
                       download
                     >

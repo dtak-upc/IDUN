@@ -1,0 +1,25 @@
+.lake-workflow {min-width:0;}
+.lake-flow-heading {margin:20px 0;}
+.lake-flow-heading h2 {font-size:26px;line-height:1.25;margin:8px 0;color:var(--ink);}
+.lake-flow-heading p {color:var(--ink-muted);margin:0;line-height:1.6;}
+.lake-flow-steps {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:10px;}
+.lake-flow-steps button {display:flex;align-items:center;gap:12px;text-align:left;border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--paper,#fff);color:var(--ink);min-width:0;cursor:pointer;}
+.lake-flow-steps b {display:grid;place-items:center;flex-shrink:0;width:30px;height:30px;border:1px solid currentColor;border-radius:50%;font-size:12px;}
+.lake-flow-steps small {display:block;margin-top:5px;font-size:11px;line-height:1.4;}
+.lake-flow-steps button[aria-selected="true"] {background:var(--action);color:#fff;border-color:var(--action);}
+.lake-flow-steps button:disabled {opacity:.55;cursor:default;}
+.lake-flow-summary {display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;margin:16px 0;padding:12px 16px;background:var(--surface,#f4f7fc);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--ink-muted);}
+.lake-flow-next {display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;margin:22px 0;padding:18px;border:1px solid var(--border);border-radius:10px;}
+.lake-flow-next p {font-size:12px;line-height:1.6;color:var(--ink-muted);}
+.lake-flow-runtime {margin:18px 0;}.lake-flow-runtime summary {cursor:pointer;font-weight:600;}
+.lake-workflow [hidden] {display:none!important;}
+.candidate-pairs {padding:18px;margin:20px 0;border:1px solid var(--border);border-radius:12px;color:var(--ink);}
+.candidate-pairs h3 {margin-top:0;}.candidate-pairs p,.candidate-pairs small {line-height:1.6;}
+.candidate-pair-controls {display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin:16px 0;}
+.candidate-pair-controls label {display:grid;gap:6px;font-size:12px;}
+.candidate-pair-controls input,.candidate-pair-controls select {max-width:220px;padding:8px;background:transparent;color:inherit;border:1px solid var(--border);border-radius:6px;}
+.candidate-pairs button {padding:8px 12px;border:1px solid var(--border);background:transparent;color:inherit;border-radius:6px;cursor:pointer;}
+.candidate-pairs button:disabled {opacity:.5;cursor:default;}
+.candidate-pair-grid {max-height:420px;overflow:auto;}.candidate-pair-grid table {width:100%;border-collapse:collapse;font-size:12px;}.candidate-pair-grid th,.candidate-pair-grid td {padding:10px;text-align:left;border-bottom:1px solid var(--border);}
+.candidate-pair-inspector {padding:16px;margin-top:16px;border:1px solid var(--action);border-radius:8px;}.candidate-pair-inspector blockquote {margin:12px 0;white-space:pre-wrap;}
+[data-theme="dark"] .lake-flow-steps button:not([aria-selected="true"]),[data-theme="dark"] .lake-flow-summary {background:#111b2c;}

@@ -5,13 +5,32 @@
       "id": "dummy",
       "name": "Dummy",
       "files": 4,
-      "snapshot": "dummy/snapshot.json"
+      "workspace": "dummy/workspace.sqlite3.gz",
+      "workspace_parts": [],
+      "metadata": "dummy/workspace.json",
+      "sha256": "f6f9ec89812183dc55487d990bb8835641626c78dc4df0f3fb35d0f49c344ae4"
     },
     {
       "id": "doc2db",
       "name": "Doc2DB",
       "files": 102,
-      "snapshot": "doc2db/snapshot.json"
+      "workspace": "",
+      "workspace_parts": [
+        "doc2db/workspace.part-0.bin",
+        "doc2db/workspace.part-1.bin",
+        "doc2db/workspace.part-2.bin"
+      ],
+      "metadata": "doc2db/workspace.json",
+      "sha256": "098d7513d1ae58b02243d8540d5d75a40f623b2519bac20e09a49ed3df1ac14a"
+    },
+    {
+      "id": "disease-az",
+      "name": "Disease_A-Z",
+      "files": 21,
+      "workspace": "disease-az/workspace.sqlite3.gz",
+      "workspace_parts": [],
+      "metadata": "disease-az/workspace.json",
+      "sha256": "034f895324be02e1a2fc0c28b96b5f8e1ac8de95a5a9c14ea49745decc6dac9f"
     }
   ]
 }

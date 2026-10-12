@@ -2073,3 +2073,410 @@
 .relationship-compare-records dt { color: #64748b; margin-top: 4px; }
 .relationship-compare-records dd { margin: 2px 0 6px; color: #1e293b; }
 @media(max-width: 600px) { .relationship-compare-records { grid-template-columns: 1fr; } }
+
+/* ==========================================================================
+   Outer Integration Views & Retention Policy (Stage 11.E)
+   ========================================================================== */
+
+.outer-policy-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.outer-policy-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.outer-policy-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.outer-policy-btn {
+  font-size: 12px;
+  padding: 5px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: white;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-weight: 500;
+}
+
+.outer-policy-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #1e293b;
+}
+
+.outer-policy-btn.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
+}
+
+.outer-scope-card {
+  margin: 12px 0 16px 0;
+  padding: 14px 16px;
+  background: #fdfdfe;
+  border: 1px solid #cbd5e1;
+  border-left: 4px solid #3b82f6;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.outer-scope-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.outer-scope-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.outer-scope-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  padding: 2px 7px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.outer-scope-header h4 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.outer-scope-counts-summary {
+  font-size: 12px;
+  color: #334155;
+}
+
+.outer-scope-counts-detail {
+  color: #64748b;
+  margin-left: 4px;
+}
+
+.outer-scope-tables-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.outer-scope-table-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scope-table-title {
+  font-size: 12px;
+  color: #1e293b;
+}
+
+.scope-table-meta {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.outer-reasons-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  font-size: 11.5px;
+}
+
+.outer-reasons-label {
+  font-weight: 600;
+  color: #475569;
+}
+
+.outer-reasons-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.reason-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+}
+
+.reason-pill code {
+  font-size: 10.5px;
+  color: #475569;
+}
+
+.reason-pill.reason-not_searched {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+.reason-pill.reason-budget_limited {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.reason-pill.reason-no_candidate {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #4b5563;
+}
+
+.reason-pill.reason-reviewed_unresolved {
+  background: #fef3c7;
+  border-color: #fcd34d;
+  color: #78350f;
+}
+
+.reason-pill.reason-reviewed_negative {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.outer-epistemic-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #166534;
+}
+
+.outer-epistemic-notice svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #15803d;
+}
+
+/* Unmatched Rows in Tables */
+.semantic-row.outer-unmatched-row {
+  background: #fafbfe;
+}
+
+.semantic-row.outer-unmatched-row:hover {
+  background: #f1f5f9;
+}
+
+.retention-badges {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.retention-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  width: fit-content;
+}
+
+.retention-badge.unmatched_left {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.retention-badge.unmatched_right {
+  background: #fdf4ff;
+  color: #9333ea;
+  border: 1px solid #f5d0fe;
+}
+
+.reason-badge {
+  display: inline-block;
+  font-size: 9.5px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: capitalize;
+  width: fit-content;
+}
+
+.reason-badge.reason-not_searched {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.reason-badge.reason-budget_limited {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.reason-badge.reason-no_candidate {
+  background: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid #d1d5db;
+}
+
+.reason-badge.reason-reviewed_unresolved {
+  background: #fef3c7;
+  color: #78350f;
+  border: 1px solid #fcd34d;
+}
+
+.reason-badge.reason-reviewed_negative {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+.outer-null-tag {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #94a3b8;
+  background: #f1f5f9;
+  border: 1px dashed #cbd5e1;
+  border-radius: 3px;
+  padding: 1px 5px;
+  letter-spacing: 0.3px;
+}
+
+.semantic-relation.unestablished {
+  background: #f1f5f9 !important;
+  color: #64748b !important;
+  border: 1px dashed #cbd5e1 !important;
+  font-weight: 500;
+}
+
+.outer-evidence-muted {
+  font-size: 11px;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.trace-muted {
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+
+.semantic-merge-header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.semantic-merge-header > div { min-width:0; overflow-wrap:anywhere; }
+.relationship-merge-confirmation { display:grid; gap:6px; padding:12px 14px; margin:14px 0; border:1px solid var(--border, #dbe3f7); border-left:3px solid #4359df; border-radius:12px; background:var(--surface-soft, #f5f7ff); overflow-wrap:anywhere; }
+.relationship-merge-boundary { display:grid; gap:8px; margin-top:10px; overflow-wrap:anywhere; }
+.relationship-merge-boundary > div { display:grid; gap:4px; padding-left:10px; border-left:2px solid #b6c2e4; }
+.relationship-merge-boundary strong { font-size:12px; }
+.relationship-review-basis { display:grid; gap:5px; margin:12px 0; padding:12px 14px; border-radius:12px; background:var(--surface-soft, #f5f7ff); overflow-wrap:anywhere; }
+.combine-definition-choices { display:grid; gap:8px; }
+.combine-definition-choices button { display:grid; gap:4px; text-align:left; white-space:normal; overflow-wrap:anywhere; padding:10px 12px; border-radius:10px; border:1px solid var(--border, #dbe3f7); background:var(--surface, white); color:inherit; }
+.combine-definition-choices button:hover { border-color:#4359df; }
+.combine-definition-choices button[aria-pressed="true"] { border-color:#4359df; box-shadow:inset 3px 0 #4359df; }
+.combine-definition-choices button strong { font-size:12px; color:#4359df; }
+[data-theme="dark"] .relationship-review-basis, [data-theme="dark"] .combine-definition-choices button { background:#18243b; border-color:#364864; }
+[data-theme="dark"] .combine-definition-choices button strong { color:#a3b2ff; }
+[data-theme="dark"] .relationship-merge-confirmation { background:#18243b; border-color:#364864; border-left-color:#8294ff; }
+.semantic-merge-header small { display:block; margin-top:6px; color:#64748b; }
+.relationship-suggestions .semantic-merge-accept { flex-shrink:0; background:#3454dc; border-color:#3454dc; color:white; border-radius:9px; padding:9px 14px; font-weight:600; }
+.relationship-suggestions .semantic-merge-accept:hover:not(:disabled) { background:#2844be; color:white; }
+.semantic-merge-evidence { margin-top:14px; padding-top:12px; border-top:1px solid #e2e8f0; }
+.semantic-merge-impact { padding:14px; border:1px solid #c7d7fc; border-radius:12px; background:#f4f7ff; margin-bottom:16px; }
+.semantic-merge-impact p { line-height:1.6; font-size:13px; }
+@media(max-width:600px) { .semantic-merge-header { align-items:flex-start; flex-direction:column; } }
+[data-theme="dark"] .semantic-merge-impact { background:#1a2540; border-color:#385087; color:#e3eafa; }
+[data-theme="dark"] .semantic-merge-header small { color:#abbad2; }
+[data-theme="dark"] .semantic-merge-evidence { border-color:#34435d; }
+[data-theme="dark"] .relationship-suggestions .semantic-merge-accept { background:#4263ed; border-color:#5676ff; color:white; }
+
+/* Relationship review stays compact in the workspace; full review is on demand. */
+.relationship-review-rail { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:16px 0; }
+.relationship-review-rail .relationship-review-launch { display:flex; gap:12px; align-items:center; text-align:left; min-width:0; padding:13px 16px; border:1px solid #dce4f3; border-radius:14px; background:#fff; color:#213657; cursor:pointer; transition:border-color .18s,box-shadow .18s,transform .18s; }
+.relationship-review-launch:hover { border-color:#8199ed; box-shadow:0 5px 18px #204ec00d; transform:translateY(-1px); }
+.relationship-review-launch:focus-visible { outline:2px solid #3454dc; outline-offset:3px; }
+.relationship-review-icon { display:grid; place-items:center; width:36px; height:36px; flex-shrink:0; border-radius:11px; background:#edf2ff; color:#3655d8; }
+.relationship-review-icon.pair-icon { background:#eef8f5; color:#178367; }
+.relationship-review-launch-copy { display:grid; gap:4px; min-width:0; flex:1; }
+.relationship-review-launch-copy strong { font-size:13px; line-height:1.4; }
+.relationship-review-launch-copy small { font-size:11px; line-height:1.4; color:#6b7b94; }
+.relationship-review-count { padding:5px 8px; border-radius:8px; background:#f0f4fb; color:#42608c; font-size:11px; font-weight:700; }
+.relationship-review-backdrop { position:fixed; inset:0; z-index:1500; display:flex; align-items:center; justify-content:center; background:#13234160; backdrop-filter:blur(5px); padding:24px; animation:relationship-review-fade .18s ease-out; }
+.relationship-suggestions.relationship-review-dialog { --rr-surface:#fff; --rr-soft:#f5f7fc; --rr-border:#e0e6f1; --rr-text:#213657; --rr-muted:#6b7b94; display:flex; flex-direction:column; width:min(100%,960px); max-height:88dvh; min-width:0; padding:0; margin:0; border:1px solid var(--rr-border); border-radius:22px; background:var(--rr-surface); color:var(--rr-text); box-shadow:0 24px 90px #101b3840; overflow:hidden; animation:relationship-review-in .2s ease-out; }
+.relationship-review-dialog-header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:22px 24px 16px; }
+.relationship-review-dialog-header>div { min-width:0; }
+.relationship-review-dialog-header small { color:var(--rr-muted); font-size:10px; letter-spacing:.11em; overflow-wrap:anywhere; }
+.relationship-review-dialog-header h2 { margin:8px 0 0; font-size:21px; line-height:1.35; color:var(--rr-text); }
+.relationship-review-dialog .relationship-review-close { display:grid; place-items:center; width:34px; height:34px; flex-shrink:0; padding:0; border-radius:10px; border:1px solid var(--rr-border); background:var(--rr-soft); color:var(--rr-text); font-size:24px; }
+.relationship-review-tabs { display:flex; gap:5px; padding:5px; margin:0 24px 16px; border-radius:12px; background:var(--rr-soft); }
+.relationship-review-dialog .relationship-review-tabs button { display:flex; gap:10px; align-items:center; justify-content:center; flex:1; padding:10px 12px; border:0; border-radius:9px; background:transparent; color:var(--rr-muted); font-size:13px; font-weight:600; }
+.relationship-review-dialog .relationship-review-tabs button[aria-selected="true"] { background:#3454dc; color:#fff; box-shadow:0 3px 8px #3454dc25; }
+.relationship-review-tabs span { border-radius:6px; padding:2px 5px; background:#8093c41a; font-size:10px; }
+.relationship-review-tabs button[aria-selected="true"] span { background:#ffffff26; }
+.relationship-review-body { overflow:auto; overscroll-behavior:contain; min-height:0; padding:0 24px 24px; }
+.relationship-review-dialog .relationship-suggestion { background:var(--rr-surface); border-color:var(--rr-border); border-radius:13px; }
+.relationship-review-dialog .relationship-suggestion article { border-color:var(--rr-border); }
+.relationship-review-dialog .relationship-suggestion blockquote,.relationship-review-dialog .relationship-compare-records dl { background:var(--rr-soft); }
+.relationship-review-dialog .relationship-compare-records dd { color:var(--rr-text); }
+.relationship-review-dialog p,.relationship-review-dialog .relationship-suggestion summary span,.relationship-review-dialog .relationship-suggestion article>small { color:var(--rr-muted); }
+.relationship-review-dialog h3 { color:var(--rr-text); }
+@keyframes relationship-review-fade { from { opacity:0; } to { opacity:1; } }
+@keyframes relationship-review-in { from { opacity:0; transform:translateY(10px) scale(.985); } to { opacity:1; transform:none; } }
+[data-theme="dark"] .relationship-review-launch { background:#172238; border-color:#30415f; color:#e2ebfb; }
+[data-theme="dark"] .relationship-review-launch-copy small { color:#a5b5cd; }
+[data-theme="dark"] .relationship-review-icon { background:#263966; color:#a8bcff; }
+[data-theme="dark"] .relationship-review-icon.pair-icon { background:#183c35; color:#80d2bd; }
+[data-theme="dark"] .relationship-review-count { background:#26344e; color:#c1d1ef; }
+[data-theme="dark"] .relationship-suggestions.relationship-review-dialog { --rr-surface:#172238; --rr-soft:#202e47; --rr-border:#344461; --rr-text:#e2ebfb; --rr-muted:#a5b5cd; }
+@media(max-width:760px) { .relationship-review-rail { grid-template-columns:1fr; } }
+@media(max-width:600px) { .relationship-review-backdrop { padding:10px; } .relationship-suggestions.relationship-review-dialog { max-height:94dvh; border-radius:16px; } .relationship-review-dialog-header { padding:18px 16px 14px; } .relationship-review-dialog-header h2 { font-size:18px; } .relationship-review-tabs { margin:0 16px 14px; } .relationship-review-dialog .relationship-review-tabs button { font-size:12px; gap:5px; padding:10px 7px; } .relationship-review-body { padding:0 16px 18px; } }
+@media(prefers-reduced-motion:reduce) { .relationship-review-launch,.relationship-review-backdrop,.relationship-review-dialog { animation:none !important; transition:none; } }
+
+.relationship-review-dialog-header,.relationship-review-dialog .semantic-merge-header { height:auto; min-height:0; background:transparent; border:0; flex-shrink:0; }
+.relationship-review-dialog .semantic-merge-header { padding:0; }
+
+[data-theme="dark"] .relationship-review-dialog .relationship-review-close,
+[data-theme="dark"] .relationship-review-dialog .review-compare-action { background:var(--rr-soft); border-color:var(--rr-border); color:var(--rr-text); }

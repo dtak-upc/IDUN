@@ -20,6 +20,9 @@ export type Job = {
   dataset_id: string;
 };
 export async function api<T>(path: string, init?: RequestInit, lake = activeLake): Promise<T> {
+  if(document.querySelector('meta[name="idun-mode"]')?.getAttribute('content')==='static'){
+    return (await import('../showcase/browser')).browserApi<T>(path,init,lake);
+  }
   if (
     document
       .querySelector('meta[name="idun-mode"]')

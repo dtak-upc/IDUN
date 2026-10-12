@@ -1,4 +1,4 @@
-import { savedDemo } from "../mode";
+import { savedDemo, inferenceUnavailable } from "../mode";
 import { useEffect, useRef, useState } from "react";
 import { api, post } from "../storage/api";
 import "./profiling.css";
@@ -70,13 +70,15 @@ type Report = {
   };
   method?: string;
 };
-export function LakeProfile() {
+export type ProfileWorkflowState = {status: string; jobStatus?: string; phase?: string; candidates?: number; revision?: string};
+export function LakeProfile({onWorkflowState, onBackToImport, onExploreLinks, onDiscover}: {onWorkflowState?: (state: ProfileWorkflowState) => void; onBackToImport?: () => void; onExploreLinks?: () => void; onDiscover?: () => void} = {}) {
   const epoch=useRef(0);
   const [report, setReport] = useState<Report>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState("");
   const [page, setPage] = useState(0);
+  useEffect(() => { onWorkflowState?.({status: report?.status || 'loading', jobStatus: report?.job?.status, phase: report?.job?.phase, candidates: report?.summary?.candidates, revision:report?.revision}); }, [report, onWorkflowState]);
   useEffect(() => {
     let active = true;
     const controller=new AbortController();
@@ -90,7 +92,7 @@ export function LakeProfile() {
           const r = await api<Report>("/profile",{signal:controller.signal});
           if (active && stamp===epoch.current) {
             setError("");
-            setReport({ ...r, job: state.job });
+            setReport({ ...r, revision: state.revision, job: state.job });
             lastRevision = state.revision;
           }
         } else if (active && stamp===epoch.current) {
@@ -146,13 +148,20 @@ export function LakeProfile() {
         <div>
           <h2>Understand your lake</h2>
           <p>
-            Explore its contents and possible connections. No source pairs to
-            choose.
+            Inspect columns, text passages and candidate connections before
+            running fine-grained discovery.
           </p>
         </div>
-        <button onClick={run} disabled={running || savedDemo}>
-          {running ? "Updating index…" : report?.status === "stale" ? "Update lake index" : "Profile saved lake"}
-        </button>
+        <div className="profile-header-actions" role="group" aria-label="Profiling actions">
+          {onBackToImport && <button className="secondary" onClick={onBackToImport}>← Back to Import</button>}
+          <button onClick={run} disabled={running || inferenceUnavailable}>
+            {running ? "Updating index…" : report?.status === "ready" ? "Re-profile" : report?.status === "stale" ? "Update lake index" : "Profile saved lake"}
+          </button>
+          {report?.status === "ready" && <>
+            {onExploreLinks && <button disabled={running || savedDemo} onClick={onExploreLinks}>Continue to Explore Links →</button>}
+            {onDiscover && <button className="secondary" disabled={running} onClick={onDiscover}>Open Discovery →</button>}
+          </>}
+        </div>
       </header>
       {error && <p role="alert">{error}</p>}
       {report?.job && (

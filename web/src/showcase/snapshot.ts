@@ -1,5 +1,6 @@
 import { publicFile } from "./paths";
 import type { SemanticPlan, DiffData } from "../integration/SemanticResults";
+import {integrationReceipt,savedLink} from './journey';
 export type Link = {
   id: string;
   table: string;
@@ -76,9 +77,30 @@ export async function savedApi<T>(path: string, init?: RequestInit, lake = ''): 
   const revision = s.state.revision;
   const id = url.pathname.split('/').at(-1)!;
   // Static hosting serves saved outputs. It never fabricates successful model calls.
+  if(method==='POST'&&url.pathname==='/discovery/handoff/inspect') {
+    const body=JSON.parse(String(init?.body||'{}'));
+    if(body.revision!==revision)throw Error('Saved evidence revision changed');
+    const start=Math.max(0,Number(body.offset||0));
+    if(body.kind==='paths')return {revision,total:s.bridges.length,offset:start,limit:12,items:await Promise.all(s.bridges.slice(start,start+12).map(async b=>{
+      const left=await findLink(s,b.left),right=await findLink(s,b.right);
+      if(!left||!right)throw Error('Saved path endpoints were not exported');
+      return {...b,left:savedLink(s,left),right:savedLink(s,right)};
+    }))} as T;
+    if(s.link_storage){const storage=s.link_storage,first=Math.floor(start/storage.page_size),last=Math.floor((start+11)/storage.page_size),links=(await Promise.all(storage.pages.slice(first,last+1).map(f=>linksFile(s,f)))).flat();return {revision,total:storage.total,offset:start,limit:12,items:links.slice(start%storage.page_size,start%storage.page_size+12).map(l=>savedLink(s,l))} as T;}
+    return {revision,total:s.links.length,offset:start,limit:12,items:s.links.slice(start,start+12).map(l=>savedLink(s,l))} as T;
+  }
   if (method !== 'GET') throw Error('This action needs the connected inference service. Saved results remain available.');
   let result: unknown;
-  if (url.pathname === '/integration') result = {discovery_ready:true,plans:plans.map(p=>({...p, stale:('stale' in p && p.stale) || false})),job:null};
+  if (/^\/integration\/[^/]+\/journey$/.test(url.pathname)) result=integrationReceipt(s,url.pathname.split('/')[2],url.searchParams);
+  else if(url.pathname==='/discovery/handoff') result={available:true,status:'prepared',revision,sources:s.state.sources,counts:{links:s.link_storage?.total??s.links.length,bridges:s.bridges.length}};
+  else if(/^\/assets\/[^/]+\/journey$/.test(url.pathname)) {
+    const src=s.sources[url.pathname.split('/')[2]],version=url.searchParams.get('version');
+    if(!src)throw Error('Saved source unavailable');
+    const savedVersion=s.assets.find(a=>a.asset_id===src.id||a.id===src.id)?.version;
+    if(version!=='saved'&&version!==savedVersion&&!s.links.some(l=>(l.table===src.id&&l.row_version===version)||(l.text===src.id&&l.text_version===version)))throw Error('This source version was not exported');
+    result=src.kind==='csv'?{kind:'table',name:src.name,version,offset,limit:20,total:src.total,columns:src.columns,rows:src.rows.slice(offset,offset+20)}:{kind:'document',name:src.name,version,offset,limit:8000,total:Array.from(src.text).length,end:Math.min(offset+8000,Array.from(src.text).length),text:Array.from(src.text).slice(offset,offset+8000).join('')};
+  }
+  else if (url.pathname === '/integration') result = {discovery_ready:true,plans:plans.map(p=>({...p, stale:('stale' in p && p.stale) || false})),job:null};
   else if (url.pathname === '/integration/schema') result = s.plan.schema_config || {mode:'open',labels:[],definitions:{}};
   else if (/^\/integration\/[^/]+\/relationship-suggestions$/.test(url.pathname)) result = s.suggestions?.[url.pathname.split('/')[2]] || {saved:false,groups:[],reviewed_labels:0};
   else if (/^\/integration\/[^/]+\/diff$/.test(url.pathname)) result = s.routes[url.pathname] || {has_previous:false,rows:[],counts:{added:0,changed:0,withdrawn:0,unchanged:0,total_current:0,total_previous:0}};

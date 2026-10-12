@@ -5,6 +5,7 @@ type Link = {
   id: string;
   table: string;
   text: string;
+  text_name?: string;
   row_index: number;
   score: number;
   start: number;
@@ -42,6 +43,7 @@ type Context = {
     end: number;
     highlight_start: number;
     highlight_end: number;
+    highlights?: {start:number;end:number;link_id:string}[];
     version: string;
   };
 };
@@ -94,6 +96,8 @@ export function RealWorkbench({
       ? `/discovery/links/${linkId}?revision=${revision || "historical"}`
       : undefined,
   );
+  const [browsing, setBrowsing] = useState(false);
+  useEffect(() => { setBrowsing(false); setChosenSource(""); setChosenCandidate(""); setChosenLink(undefined); setOffset(0); }, [linkId, companionId]);
   const [chosenSource, setChosenSource] = useState("");
   const [k, setK] = useState(5);
   const [chosenCandidate, setChosenCandidate] = useState("");
@@ -109,7 +113,9 @@ export function RealWorkbench({
       : undefined,
   );
   const candidates = rank?.value?.candidates || [];
-  const candidate =
+  const candidate = !browsing && seed?.value
+    ? candidates.find(c => c.id === seed.value!.text) || {id:seed.value.text,name:seed.value.text_name || "Opened document",score:seed.value.score,links:0}
+    :
     candidates.find((c) => c.id === chosenCandidate) ||
     candidates.find((c) => c.id === seed?.value?.text) ||
     candidates[0];
@@ -124,10 +130,10 @@ export function RealWorkbench({
     seed?.value &&
     ((source === seed.value.table && candidate?.id === seed.value.text) ||
       (source === seed.value.text && candidate?.id === seed.value.table));
-  const selected =
+  const selected = !browsing && linkId ? linkId :
     chosenLink?.pair === pair
       ? chosenLink.id
-      : seedMatches && offset === 0
+      : !browsing && seedMatches && offset === 0
         ? seed?.value?.id
         : page?.value?.items[0]?.id;
   const evidenceId=selected || (!revision ? linkId : undefined);
@@ -152,11 +158,20 @@ export function RealWorkbench({
   const error =
     statusError || seed?.error || rank?.error || page?.error || context?.error;
   const points = detail ? Array.from(detail.document.text) : [];
-  const start = detail
-      ? detail.document.highlight_start - detail.document.start
-      : 0,
-    end = detail ? detail.document.highlight_end - detail.document.start : 0;
+  const ranges = (detail?.document.highlights || (detail ? [{start:detail.document.highlight_start,end:detail.document.highlight_end,link_id:detail.links[0].id}] : []))
+    .map(r => ({start:r.start - (detail?.document.start || 0),end:r.end - (detail?.document.start || 0)})).sort((a,b)=>a.start-b.start);
+  const mergedRanges: {start:number;end:number}[] = [];
+  for (const range of ranges) {
+    const previous = mergedRanges[mergedRanges.length-1];
+    if (previous && range.start <= previous.end) previous.end=Math.max(previous.end,range.end);
+    else mergedRanges.push({...range});
+  }
+  const segments: {start:number;end:number;highlight:boolean}[]=[];
+  let cursor=0;
+  for (const range of mergedRanges) { segments.push({start:cursor,end:range.start,highlight:false},{...range,highlight:true});cursor=range.end; }
+  segments.push({start:cursor,end:points.length,highlight:false});
   function chooseSource(id: string) {
+    setBrowsing(true);
     setChosenSource(id);
     setChosenCandidate("");
     setChosenLink(undefined);
@@ -255,6 +270,7 @@ export function RealWorkbench({
                         <button
                           aria-pressed={c.id === candidate?.id}
                           onClick={() => {
+                            setBrowsing(true);
                             setChosenCandidate(c.id);
                             setChosenLink(undefined);
                             setOffset(0);
@@ -291,7 +307,7 @@ export function RealWorkbench({
                     ? selected
                     : ""
                 }
-                onChange={(e) => setChosenLink({ pair, id: e.target.value })}
+                onChange={(e) => { setBrowsing(true); setChosenLink({ pair, id: e.target.value }); }}
               >
                 {!page?.value?.items.some((l) => l.id === selected) && (
                   <option value="">
@@ -310,6 +326,7 @@ export function RealWorkbench({
               <button
                 disabled={!offset}
                 onClick={() => {
+                  setBrowsing(true);
                   setOffset(Math.max(0, offset - 20));
                   setChosenLink(undefined);
                 }}
@@ -320,6 +337,7 @@ export function RealWorkbench({
               <button
                 disabled={!page?.value || offset + 20 >= page.value.total}
                 onClick={() => {
+                  setBrowsing(true);
                   setOffset(offset + 20);
                   setChosenLink(undefined);
                 }}
@@ -389,12 +407,10 @@ export function RealWorkbench({
                                       {linked ? (
                                         <button
                                           aria-label={`Inspect row ${r.index}`}
-                                          onClick={() =>
-                                            setChosenLink({
-                                              pair,
-                                              id: linked.id,
-                                            })
-                                          }
+                                          onClick={() => {
+                                            setBrowsing(true);
+                                            setChosenLink({ pair, id: linked.id });
+                                          }}
                                         >
                                           {r.index}
                                         </button>
@@ -428,15 +444,9 @@ export function RealWorkbench({
                   </header>
                   <div className="rw-document-body">
                     <h2>{detail.document.name}</h2>
-                    <p>
-                      Highlighted model text unit · Unicode offsets{" "}
-                      {detail.document.highlight_start}–
-                      {detail.document.highlight_end} (end exclusive)
-                    </p>
+                    <p>Highlighted model text {detail.links.length > 1 ? 'units' : 'unit'} · Unicode offsets {ranges.map(r => `${r.start+detail.document.start}–${r.end+detail.document.start}`).join(' · ')} (end exclusive)</p>
                     <div className="rw-text-context">
-                      {points.slice(0, start).join("")}
-                      <mark>{points.slice(start, end).join("")}</mark>
-                      {points.slice(end).join("")}
+                      {segments.map((s,i) => s.highlight ? <mark key={i}>{points.slice(s.start,s.end).join("")}</mark> : <span key={i}>{points.slice(s.start,s.end).join("")}</span>)}
                     </div>
                     <small>
                       Source excerpt {detail.document.start}–

@@ -2,10 +2,12 @@ import { savedCsvHref } from "../showcase/snapshot";
 import { useEffect, useRef, useState } from "react";
 import { api, post, selectedApiLake } from "../storage/api";
 import { SemanticResults, type SemanticPlan, type DiffData } from "./SemanticResults";
-import { RelationshipSchemaStudio, type SchemaConfig, DEFAULT_LABELS } from "./RelationshipSchemaStudio";
+import { RelationshipSchemaStudio, type SchemaConfig } from "./RelationshipSchemaStudio";
 import "./integration.css";
 import "../storage/lakes.css";
-import { publicDemo, savedDemo } from "../mode";
+import { publicDemo, savedDemo, inferenceUnavailable } from "../mode";
+import { IntegrationJourney } from "../journey/IntegrationJourney";
+import { DataJourneyButton } from "../journey/DataJourneyButton";
 type Summary = {
   id: string;
   title: string;
@@ -17,6 +19,7 @@ type Summary = {
 };
 type State = {
   discovery_ready: boolean;
+  discovery_revision?: string;
   resume?: {budget:number;total:number;completed:number;fingerprint:string;schema_config:SchemaConfig | null} | null;
   job?: { status: string; phase: string; completed: number; total: number; plan_id?: string };
   plans: Summary[];
@@ -26,7 +29,7 @@ export function IntegratedDatasets({
   onSettings,
   onDiscovery,
 }: {
-  onEvidence: (l: string, r: string) => void;
+  onEvidence: (l: string, r?: string) => void;
   onSettings: () => void;
   onDiscovery: () => void;
 }) {
@@ -39,15 +42,22 @@ export function IntegratedDatasets({
   const [renaming, setRenaming] = useState("");
   const [runName, setRunName] = useState("");
   const [removing, setRemoving] = useState<Summary>();
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useState(()=>{
+    try{return localStorage.getItem(`idun:integration-selected:${selectedApiLake()}`)||'';}catch{return '';}
+  });
+  useEffect(()=>{
+    if(!selected)return;
+    try{localStorage.setItem(`idun:integration-selected:${selectedApiLake()}`,selected);}catch{/* Selection remains usable when browser storage is unavailable. */}
+  },[selected]);
   const [menuOpenRunId, setMenuOpenRunId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<{ key: string; plan: SemanticPlan }>();
   const [diffData, setDiffData] = useState<DiffData | null>(null);
   const [schemaStudioOpen, setSchemaStudioOpen] = useState(false);
   const [schemaReady, setSchemaReady] = useState(savedDemo);
   const [schemaConfig, setSchemaConfig] = useState<SchemaConfig>({
-    mode: "strict",
-    labels: [...DEFAULT_LABELS],
+    mode: "open",
+    prompt_id: "generic-evidence-v1",
+    labels: ["NEGATIVE", "UNRESOLVED"],
     definitions: {},
   });
   const [hfLoaded, setHfLoaded] = useState<{ loaded: boolean; repo_id: string; vram_mb: number } | null>(null);
@@ -172,7 +182,7 @@ export function IntegratedDatasets({
       className="integrated-datasets"
       aria-label="Live semantic integration"
     >
-      <div className="integration-heading">
+      <div className="integration-heading journey-workspace-heading">
         <div>
           <span className="live-kicker">
             FROM TEXT-MEDIATED JOIN PATHS
@@ -183,7 +193,7 @@ export function IntegratedDatasets({
             relationship.
           </p>
         </div>
-        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
           {hfLoaded?.loaded && (
             <button
               type="button"
@@ -195,12 +205,13 @@ export function IntegratedDatasets({
               {unloading ? "Unloading…" : `⚡ Unload LLM (${hfLoaded.repo_id.split("/").pop()})`}
             </button>
           )}
-          <button onClick={onSettings}>LLM settings</button>
+          <button onClick={onSettings}>LLM Settings</button>
+          <DataJourneyButton stage="Integration"><IntegrationJourney lakeId={selectedApiLake()} runId={summary?.id} refreshKey={`${state?.discovery_ready}/${state?.discovery_revision}/${key}/${plan?.content_revision}`} onEvidence={onEvidence}/></DataJourneyButton>
         </div>
       </div>
       <div className="integration-start">
         <div>
-          <strong>Build a semantic integration</strong>
+          <strong>Build a Semantic Integration</strong>
           <p>
             Automatically rank complementary row pairs, cluster their evidence
             and infer relationships.
@@ -210,9 +221,9 @@ export function IntegratedDatasets({
           Operation
           <select aria-label="Integration operation" value={runMode} disabled={running}
             onChange={e => setRunMode(e.target.value as typeof runMode)}>
-            <option value="new">New run</option>
-            <option value="extend" disabled={!summary}>Extend selected run</option>
-            <option value="rebuild" disabled={!summary}>Rebuild selected run</option>
+            <option value="new">New Run</option>
+            <option value="extend" disabled={!summary}>Extend Selected Run</option>
+            <option value="rebuild" disabled={!summary}>Rebuild Selected Run</option>
           </select>
         </label>
         <label>
@@ -247,16 +258,16 @@ export function IntegratedDatasets({
         </div>
         <button
           className="integration-primary"
-          disabled={running || !schemaReady || !state?.discovery_ready || (runMode !== 'new' && !plan?.content_revision)}
+          disabled={inferenceUnavailable || running || !schemaReady || !state?.discovery_ready || (runMode !== 'new' && !plan?.content_revision)}
           onClick={() =>
             act(async () => {
               await propose();
             })
           }
         >
-          {runMode === 'new' ? 'Propose with LLM' : runMode === 'extend' ? 'Extend selected run' : 'Rebuild selected run'}
+          {runMode === 'new' ? 'Propose with LLM' : runMode === 'extend' ? 'Extend Selected Run' : 'Rebuild Selected Run'}
         </button>
-        {state?.resume && <button disabled={running || !schemaReady} onClick={()=>act(async()=>{
+        {state?.resume && <button disabled={inferenceUnavailable || running || !schemaReady} onClick={()=>act(async()=>{
           setState(await post<State>("/integration",{resume:state.resume!.fingerprint,limit:state.resume!.budget}));
         })}>Resume original batch ({state.resume.completed}/{state.resume.total})</button>}
       </div>
@@ -296,7 +307,7 @@ export function IntegratedDatasets({
                 )
               }
             >
-              Cancel integration
+              Cancel Integration
             </button>
           )}
         </div>
@@ -423,9 +434,9 @@ export function IntegratedDatasets({
                 void api<SchemaConfig>("/integration/schema").then(c => setSchemaConfig(c)).catch(() => null);
                 void api<State>("/integration").then(s => setState(s)).catch(() => null);
               }}
-              onMaterialize={() =>
+              onMaterialize={(policy?: string) =>
                 act(async () => {
-                  await post(`/integration/${plan.id}/materialize`);
+                  await post(`/integration/${plan.id}/materialize`, policy ? { policy } : {});
                   setState(await api<State>("/integration"));
                 })
               }

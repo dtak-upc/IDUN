@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, post } from "../storage/api";
 import "./live.css";
 import { LiveLandscape } from "./LiveLandscape";
+import type { CommittedScope } from "../inference/ReviewScope";
 type Link = {
   id: string;
   table: string;
@@ -33,6 +34,7 @@ type Bridge = {
 };
 type Result = {
   status: string;
+  scope?: CommittedScope;
   revision?: string;
   threshold?: number;
   sources?: { id: string; name: string }[];
@@ -61,7 +63,7 @@ type Result = {
   };
 };
 type Page<T> = { revision?: string; total: number; offset: number; items: T[] };
-export function LiveDiscovery({
+export function PublishedEvidence({
   onOpenEvidence,
   onIntake,
 }: {
@@ -72,7 +74,6 @@ export function LiveDiscovery({
   const [result, setResult] = useState<Result>();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [threshold, setThreshold] = useState(0.15);
   const [view, setView] = useState<"links" | "bridges">("links");
   const [source, setSource] = useState("");
   const [page, setPage] = useState(0);
@@ -91,94 +92,77 @@ export function LiveDiscovery({
   const items = loadedPage?.key === queryKey ? loadedPage.data : undefined;
   useEffect(() => {
     let active = true;
-    const controller=new AbortController();
+    const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
     async function refresh() {
-      const requestEpoch=epoch.current;
+      const requestEpoch = epoch.current;
       try {
-        const r = await api<Result>("/discovery",{signal:controller.signal});
-        if (active && requestEpoch===epoch.current) {setResult(r);setError("");}
+        const r = await api<Result>("/discovery", {
+          signal: controller.signal,
+        });
+        if (active && requestEpoch === epoch.current) {
+          setResult(r);
+          setError("");
+        }
       } catch (e) {
         if (active) setError(String(e));
-      } finally {if(active) timer=setTimeout(refresh,2000);}
+      } finally {
+        if (active) timer = setTimeout(refresh, 2000);
+      }
     }
     void refresh();
     return () => {
       active = false;
-      clearTimeout(timer);controller.abort();
+      clearTimeout(timer);
+      controller.abort();
     };
   }, []);
   useEffect(() => {
     setPage(0);
-    if(source && result?.sources && !result.sources.some(s=>s.id===source)) setSource("");
+    if (
+      source &&
+      result?.sources &&
+      !result.sources.some((s) => s.id === source)
+    )
+      setSource("");
   }, [result?.revision]);
   useEffect(() => {
-    let active=true;
+    let active = true;
     let timer: ReturnType<typeof setTimeout>;
-    const controller=new AbortController();
+    const controller = new AbortController();
     setLoadedPage(undefined);
     async function load() {
       try {
-        const r=await api<Page<Link | Bridge>>(`/discovery/${view}?offset=${page*20}&source=${encodeURIComponent(source)}`,{signal:controller.signal});
-        if(r.revision && r.revision!==result?.revision) throw Error('Discovery changed; refreshing results…');
-        if(active){setLoadedPage({key:queryKey,data:r});setError("");}
-      } catch(e){if(active){setError(String(e));timer=setTimeout(load,1500);}}
+        const r = await api<Page<Link | Bridge>>(
+          `/discovery/${view}?offset=${page * 20}&source=${encodeURIComponent(source)}`,
+          { signal: controller.signal },
+        );
+        if (r.revision && r.revision !== result?.revision)
+          throw Error("Discovery changed; refreshing results…");
+        if (active) {
+          setLoadedPage({ key: queryKey, data: r });
+          setError("");
+        }
+      } catch (e) {
+        if (active) {
+          setError(String(e));
+          timer = setTimeout(load, 1500);
+        }
+      }
     }
-    if(result?.status==='ready') void load();
-    return ()=>{active=false;clearTimeout(timer);controller.abort();};
+    if (result?.status === "ready") void load();
+    return () => {
+      active = false;
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [queryKey]);
   const running =
     busy ||
     ["queued", "running", "cancelling"].includes(result?.job?.status || "");
   const names = new Map(result?.sources?.map((s) => [s.id, s.name]) || []);
-  async function run() {
-    epoch.current++;
-    setBusy(true);
-    setError("");
-    try {
-      setResult(await post<Result>("/discovery", { threshold }));
-      setPage(0);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
   return (
     <section className="live-discovery" aria-label="Live LOKI discovery">
-      <header>
-        <div>
-          <span className="live-kicker">YOUR SAVED LAKE · LOKI</span>
-          <h1>Discover Your Lake</h1>
-          <p>
-            Contextual discovery across the indexed lake. No source pairs to
-            choose.
-          </p>
-        </div>
-        <button className="live-primary" disabled={running || savedDemo} onClick={run}>
-          {running ? "LOKI is working…" : "Run LOKI discovery"}
-        </button>
-      </header>
-      <details>
-        <summary>Scoring policy</summary>
-        <label>
-          Minimum LOKI score{" "}
-          <input
-            aria-label="Minimum LOKI score"
-            type="number"
-            min={-1}
-            max={1}
-            step={0.01}
-            value={threshold}
-            disabled={running || savedDemo}
-            onChange={(e) => setThreshold(Number(e.target.value))}
-          />
-        </label>
-        <p>
-          Checkpoint default: 0.15, uncalibrated for this raw lake. Keep bounded
-          join candidates and their evidence. Scores are not probabilities.
-        </p>
-      </details>
       {error && <p role="alert">{error}</p>}
       {result?.job && (
         <div
@@ -217,9 +201,10 @@ export function LiveDiscovery({
               : "Ready to discover"}
           </h2>
           <p>
-            Update the index in Data Lake, then run LOKI here. Unchanged contexts
-            are reused; affected contexts are rescored. Earlier integration runs
-            and their saved evidence remain available in Integration.
+            Update the index in Data Lake, then run LOKI here. Unchanged
+            contexts are reused; affected contexts are rescored. Earlier
+            integration runs and their saved evidence remain available in
+            Integration.
           </p>
           <button onClick={onIntake}>Go to Data Lake</button>
         </div>
@@ -265,7 +250,7 @@ export function LiveDiscovery({
               <b>{result.summary?.one_sided}</b> one-sided links
             </span>
             <span>
-              <b>{result.summary?.contexts}</b> table-text pairs
+              <b>{result.summary?.contexts}</b> table-context blocks
             </span>
           </div>
           <p>{result.notice}</p>
@@ -276,23 +261,6 @@ export function LiveDiscovery({
             threshold {result.threshold}. {result.summary?.rows_without_links}{" "}
             row contexts have no retained link.
           </p>
-          <details>
-            <summary>Coverage and execution</summary>
-            <p>
-              {result.coverage?.eligible_links} scores met the threshold before
-              the per-row cap. Join-path budgets omitted{" "}
-              {result.coverage?.bridge_group_links_omitted} group-link entries
-              and {result.coverage?.bridges_omitted} join-path candidates. Text
-              units retain Step 08's provisional segmentation and sampling.
-              Links without cross-table support remain available for later
-              augmentation.
-            </p>
-            <p>
-              Last scoring work: {result.work?.scored_contexts} table-text pairs ·{" "}
-              {result.work?.peak_reserved_gib.toFixed(2)} GiB PyTorch peak
-              reservation · {result.work?.seconds.toFixed(2)} seconds.
-            </p>
-          </details>
           <div className="live-tools">
             <button
               aria-pressed={view === "links"}
@@ -301,7 +269,7 @@ export function LiveDiscovery({
                 setPage(0);
               }}
             >
-              Row-sentence atomic links
+              Row-Sentence Atomic Links
             </button>
             <button
               aria-pressed={view === "bridges"}
@@ -310,7 +278,7 @@ export function LiveDiscovery({
                 setPage(0);
               }}
             >
-              Join-path candidates
+              Join-Path Candidates
             </button>
             {view === "links" && (
               <select
@@ -381,8 +349,8 @@ export function LiveDiscovery({
                   </span>
                   <span className="live-score">{item.score.toFixed(3)}</span>
                   <p>
-                    Inspect both rows and their shared evidence. This is a join-path
-                    candidate, not a materialized relation.
+                    Inspect both rows and their shared evidence. This is a
+                    join-path candidate, not a materialized relation.
                   </p>
                 </button>
               ),
@@ -414,3 +382,5 @@ export function LiveDiscovery({
   );
 }
 export { RealWorkbench as LiveEvidence } from "./RealWorkbench";
+
+export { DiscoveryWorkflow as LiveDiscovery } from "./DiscoveryWorkflow";

@@ -1,8 +1,55 @@
-import { apiUrl } from "../storage/api";
-import { useState } from "react";
+import { apiUrl, api } from "../storage/api";
+import { useState, useEffect } from "react";
 import { RelationshipSpace } from "./RelationshipSpace";
 import { RelationshipSuggestions } from "./RelationshipSuggestions";
 import { CombineRelationshipsModal } from "./CombineRelationshipsModal";
+
+export type OuterScope = {
+  scope_id: string;
+  relation: string;
+  left_table: {
+    id: string;
+    name: string;
+    version: string;
+    columns: string[];
+    total_rows: number;
+    matched_rows: number;
+    unmatched_rows: number;
+  };
+  right_table: {
+    id: string;
+    name: string;
+    version: string;
+    columns: string[];
+    total_rows: number;
+    matched_rows: number;
+    unmatched_rows: number;
+  };
+  matched_pairs_count: number;
+  is_self_join: boolean;
+};
+
+export type OuterView = {
+  plan_id: string;
+  policy: string;
+  scope: OuterScope;
+  counts: {
+    matched_rows: number;
+    unmatched_left: number;
+    unmatched_right: number;
+    total_rows: number;
+    unique_matched_left_records: number;
+    unique_matched_right_records: number;
+    reasons_breakdown: Record<string, number>;
+  };
+  columns: {
+    left_columns: string[];
+    right_columns: string[];
+  };
+  rows: any[];
+  notice: string;
+};
+
 export type SchemaConfig = {
   mode?: "strict" | "hybrid" | "open";
   labels?: string[];
@@ -13,6 +60,8 @@ export type SchemaConfig = {
 };
 
 export type SemanticPlan = {
+  journey_input?: {revision:string;evidence_filter?:{min_score?:number;max_score?:number;top_k?:number};summary?:{links?:number;bridges?:number}};
+  parent_run_id?: string;
   id: string;
   schema_config?: SchemaConfig;
   content_revision?: string;
@@ -90,6 +139,9 @@ type Decision = {
   }[];
 };
 type JoinedRow = {
+  left_record?: string;
+  right_record?: string;
+  evidence?: {evidence?:string;text?:string;context_text?:string;score?:number;ce_score?:number}[];
   candidate: string;
   left_value: string;
   right_value: string;
@@ -217,10 +269,10 @@ export function SemanticResults({
   plan: SemanticPlan;
   diff?: DiffData;
   busy: boolean;
-  onMaterialize: () => void;
+  onMaterialize: (policy?: string) => void;
   onEvidence: (l: string, r: string) => void;
   onPlanUpdated?: (updated: SemanticPlan) => void;
-  csvHref?: (relation?: string) => string;
+  csvHref?: (relation?: string, policy?: string) => string;
 }) {
   const [view, setView] = useState("table");
   const [relation, setRelation] = useState("all");
@@ -230,6 +282,54 @@ export function SemanticResults({
   const [diffFilter, setDiffFilter] = useState<"all" | DiffStatus>("all");
   const [remapModalOpen, setRemapModalOpen] = useState(false);
   const [remapModalSources, setRemapModalSources] = useState<string[]>([]);
+  const [resumeReview, setResumeReview] = useState<{panel:'meanings'|'pairs';serial:number}>();
+  const [mergeSuggestion, setMergeSuggestion] = useState<{target:string;kind:'equivalent'|'direction_review'|'structural'} | undefined>();
+  const [outerPolicy, setOuterPolicy] = useState<"matched-only" | "preserve-left" | "preserve-both">("matched-only");
+  const [outerScopes, setOuterScopes] = useState<OuterScope[]>([]);
+  const [outerViews, setOuterViews] = useState<Record<string, OuterView>>({});
+
+  useEffect(() => {
+    let active = true;
+    api<OuterScope[]>(`/integration/${plan.id}/outer-scopes`)
+      .then((scopes) => {
+        if (active) setOuterScopes(scopes || []);
+      })
+      .catch(() => {
+        if (active) setOuterScopes([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [plan.id]);
+
+  useEffect(() => {
+    let active = true;
+    if (outerPolicy === "matched-only") return;
+    const rels = [...new Set(plan.output.map((r) => r.relation))];
+    Promise.all(
+      rels.map(async (rel) => {
+        try {
+          const v = await api<OuterView>(
+            `/integration/${plan.id}/outer-view?policy=${outerPolicy}&relation=${encodeURIComponent(rel)}`
+          );
+          return [rel, v] as const;
+        } catch {
+          return null;
+        }
+      })
+    ).then((results) => {
+      if (active) {
+        const next: Record<string, OuterView> = {};
+        for (const item of results) {
+          if (item) next[item[0]] = item[1];
+        }
+        setOuterViews(next);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [plan.id, outerPolicy, plan.output]);
 
   const activeRows: DiffRow[] =
     diffMode && diff?.has_previous
@@ -237,6 +337,17 @@ export function SemanticResults({
       : plan.output;
 
   const relations = [...new Set(activeRows.map((r) => r.relation))];
+
+  const getCsvUrl = (rel?: string) => {
+    if (csvHref) {
+      return csvHref(rel, outerPolicy !== "matched-only" ? outerPolicy : undefined);
+    }
+    const params = new URLSearchParams();
+    if (rel) params.set("relation", rel);
+    if (outerPolicy !== "matched-only") params.set("policy", outerPolicy);
+    const q = params.toString();
+    return apiUrl(`/integration/${plan.id}/csv${q ? `?${q}` : ""}`);
+  };
   const cols = (rows: JoinedRow[], side: "left" | "right") =>
     Array.from(
       new Map(
@@ -315,14 +426,14 @@ export function SemanticResults({
           </small>
         </div>
       </div>
-      <RelationshipSuggestions key={plan.id} plan={plan} onEvidence={onEvidence}
-        onCombine={labels => { setRemapModalSources(labels); setRemapModalOpen(true); }} />
+      <RelationshipSuggestions key={plan.id} plan={plan} resumeReview={resumeReview} onEvidence={onEvidence}
+        onCombine={(labels, suggestion) => { setRemapModalSources(labels); setMergeSuggestion(suggestion); setRemapModalOpen(true); }} />
       <div className="integration-actions">
         <button
           aria-pressed={view === "table"}
           onClick={() => setView("table")}
         >
-          Relationship tables
+          Relationship Tables
         </button>
         <button
           aria-pressed={view === "decisions"}
@@ -331,7 +442,7 @@ export function SemanticResults({
             setView("decisions");
           }}
         >
-          Review every decision
+          Review Every Decision
         </button>
         {diff?.has_previous && (
           <button
@@ -361,6 +472,7 @@ export function SemanticResults({
           className="integration-primary combine-labels-action-btn"
           disabled={busy || !plan.output.length}
           onClick={() => {
+            setMergeSuggestion(undefined);
             setRemapModalSources([]);
             setRemapModalOpen(true);
           }}
@@ -370,18 +482,18 @@ export function SemanticResults({
         </button>
         {plan.materialized ? (
           <a
-            href={csvHref ? csvHref() : apiUrl(`/integration/${plan.id}/csv`)}
+            href={getCsvUrl()}
             download
           >
-            Download joined CSV ↓
+            Download {outerPolicy === "matched-only" ? "joined" : outerPolicy === "preserve-left" ? "left-outer" : "full-outer"} CSV ↓
           </a>
         ) : (
           <button
             className="integration-primary"
-            disabled={busy || !plan.output.length}
-            onClick={onMaterialize}
+            disabled={busy || (!plan.output.length && outerPolicy === "matched-only")}
+            onClick={() => onMaterialize(outerPolicy)}
           >
-            Materialize {plan.output.length} joined rows
+            Materialize {outerPolicy === "matched-only" ? `${plan.output.length} joined rows` : `${outerPolicy} view`}
           </button>
         )}
       </div>
@@ -447,6 +559,38 @@ export function SemanticResults({
 
       {view === "table" ? (
         <>
+          <div className="outer-policy-toolbar" role="toolbar" aria-label="Join materialization policy">
+            <span className="outer-policy-label">Retention Policy:</span>
+            <div className="outer-policy-buttons">
+              <button
+                type="button"
+                className={`outer-policy-btn ${outerPolicy === "matched-only" ? "active" : ""}`}
+                aria-pressed={outerPolicy === "matched-only"}
+                onClick={() => setOuterPolicy("matched-only")}
+                title="Matched only: evidence-confirmed relationships only (Inner join)"
+              >
+                Matched Only (Inner)
+              </button>
+              <button
+                type="button"
+                className={`outer-policy-btn ${outerPolicy === "preserve-left" ? "active" : ""}`}
+                aria-pressed={outerPolicy === "preserve-left"}
+                onClick={() => setOuterPolicy("preserve-left")}
+                title="Preserve left: retain all left source records, marking counterparts as [OUTER_NULL] (Left outer join)"
+              >
+                Preserve Left (Left Outer)
+              </button>
+              <button
+                type="button"
+                className={`outer-policy-btn ${outerPolicy === "preserve-both" ? "active" : ""}`}
+                aria-pressed={outerPolicy === "preserve-both"}
+                onClick={() => setOuterPolicy("preserve-both")}
+                title="Preserve both: retain all left and right source records, marking counterparts as [OUTER_NULL] (Full outer join)"
+              >
+                Preserve Both (Full Outer)
+              </button>
+            </div>
+          </div>
           <div
             className="semantic-relation-tabs"
             aria-label="Relationship tables"
@@ -455,7 +599,7 @@ export function SemanticResults({
               aria-pressed={relation === "all"}
               onClick={() => setRelation("all")}
             >
-              All relationships ({activeRows.length})
+              All Relationships ({activeRows.length})
             </button>
             {relations.map((r) => (
               <button
@@ -479,7 +623,9 @@ export function SemanticResults({
           {relations
             .filter((r) => relation === "all" || r === relation)
             .map((group) => {
-              const rows = activeRows.filter((r) => r.relation === group);
+              const isOuter = outerPolicy !== "matched-only";
+              const outerView = isOuter ? outerViews[group] : undefined;
+              const rows = outerView ? outerView.rows : activeRows.filter((r) => r.relation === group);
               const leftCols = cols(rows, "left"),
                 rightCols = cols(rows, "right");
 
@@ -551,7 +697,7 @@ export function SemanticResults({
                     <div>
                       <h3>{label(group)}</h3>
                       <p>
-                        {rows.length} joined rows · Source records and
+                        {rows.length} {isOuter ? "materialized rows" : "joined rows"} · Source records and
                         supporting evidence
                         {diffMode && (
                           <span> · ({rows.filter((x) => x.diff_status === "added").length} added, {rows.filter((x) => x.diff_status === "changed").length} changed, {rows.filter((x) => x.diff_status === "withdrawn").length} withdrawn)</span>
@@ -563,7 +709,7 @@ export function SemanticResults({
                         type="button"
                         className="group-remap-btn"
                         onClick={() => {
-                          setRemapModalSources([group]);
+                          setMergeSuggestion(undefined); setRemapModalSources([group]);
                           setRemapModalOpen(true);
                         }}
                         title={`Rename or merge ${group}`}
@@ -572,11 +718,7 @@ export function SemanticResults({
                       </button>
                       {plan.materialized && (
                         <a
-                          href={
-                            csvHref
-                              ? csvHref(group)
-                              : apiUrl(`/integration/${plan.id}/csv?relation=${encodeURIComponent(group)}`)
-                          }
+                          href={getCsvUrl(group)}
                           download
                         >
                           Download {label(group)} CSV ↓
@@ -584,6 +726,57 @@ export function SemanticResults({
                       )}
                     </div>
                   </header>
+                  {outerView && (
+                    <div className="outer-scope-card" role="region" aria-label="Outer join scope and provenance">
+                      <div className="outer-scope-header">
+                        <div className="outer-scope-title-wrap">
+                          <span className="outer-scope-badge">
+                            {outerPolicy === "preserve-left" ? "LEFT OUTER JOIN SCOPE" : "FULL OUTER JOIN SCOPE"}
+                          </span>
+                          <h4>Scope: {outerView.scope.left_table.name} ↔ {outerView.scope.right_table.name}</h4>
+                        </div>
+                        <div className="outer-scope-counts-summary">
+                          <span><strong>{outerView.counts.total_rows}</strong> total rows</span>
+                          <span className="outer-scope-counts-detail">
+                            (<strong>{outerView.counts.matched_rows}</strong> matched, <strong>{outerView.counts.unmatched_left}</strong> unmatched left{outerPolicy === "preserve-both" ? `, <strong>${outerView.counts.unmatched_right}</strong> unmatched right` : ""})
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="outer-scope-tables-grid">
+                        <div className="outer-scope-table-info">
+                          <div className="scope-table-title">Left Table: <strong>{outerView.scope.left_table.name}</strong></div>
+                          <small className="scope-table-meta">Version: {outerView.scope.left_table.version || "initial"} · {outerView.scope.left_table.total_rows} total rows ({outerView.scope.left_table.matched_rows} matched, {outerView.scope.left_table.unmatched_rows} unmatched)</small>
+                        </div>
+                        <div className="outer-scope-table-info">
+                          <div className="scope-table-title">Right Table: <strong>{outerView.scope.right_table.name}</strong></div>
+                          <small className="scope-table-meta">Version: {outerView.scope.right_table.version || "initial"} · {outerView.scope.right_table.total_rows} total rows ({outerView.scope.right_table.matched_rows} matched{outerPolicy === "preserve-both" ? `, ${outerView.scope.right_table.unmatched_rows} unmatched` : ""})</small>
+                        </div>
+                      </div>
+
+                      {Object.keys(outerView.counts.reasons_breakdown || {}).length > 0 && (
+                        <div className="outer-reasons-bar">
+                          <span className="outer-reasons-label">Unmatched Retention Reasons:</span>
+                          <div className="outer-reasons-pills">
+                            {Object.entries(outerView.counts.reasons_breakdown).map(([reason, count]) => (
+                              <span key={reason} className={`reason-pill reason-${reason}`}>
+                                <code>{reason.replace("_", " ")}</code>: <strong>{count}</strong>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="outer-epistemic-notice">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="12" y1="16" x2="12" y2="12" />
+                          <line x1="12" y1="8" x2="12.01" y2="8" />
+                        </svg>
+                        <span>{outerView.notice}</span>
+                      </div>
+                    </div>
+                  )}
                   <div className="integration-table semantic-table">
                     <table aria-label={`${label(group)} joined records`}>
                       <thead>
@@ -612,104 +805,163 @@ export function SemanticResults({
                         </tr>
                       </thead>
                       <tbody>
-                        {rows.map((r) => (
-                          <tr
-                            key={r.diff_key || `${r.candidate}/${r.relation}/${r.direction || ""}/${r.diff_status || ""}`}
-                            className={`semantic-row ${diffMode && r.diff_status ? `diff-row-${r.diff_status}` : ""}`}
-                          >
-                            <td>
-                              <div className="pair-cell">
-                                <strong>{r.candidate}</strong>
-                                <small>Cluster {r.cluster}</small>
-                                {diffMode && r.diff_status && (
-                                  <span className={`diff-badge diff-badge-${r.diff_status}`}>
-                                    {r.diff_status === "added" && "+ Added"}
-                                    {r.diff_status === "changed" && "Δ Changed"}
-                                    {r.diff_status === "withdrawn" && "- Withdrawn"}
-                                    {r.diff_status === "unchanged" && "= Unchanged"}
-                                    {r.diff_status === "not_reviewed" && "Not reviewed"}
+                        {rows.map((r) => {
+                          const isUnmatched = r.retention_type && r.retention_type !== "matched";
+                          const rowKey = r.diff_key || `${r.candidate}/${r.relation}/${r.direction || ""}/${r.diff_status || ""}`;
+                          return (
+                            <tr
+                              key={rowKey}
+                              className={`semantic-row ${diffMode && r.diff_status ? `diff-row-${r.diff_status}` : ""} ${isUnmatched ? `outer-unmatched-row ${r.retention_type}` : ""}`}
+                            >
+                              <td>
+                                <div className="pair-cell">
+                                  <strong>{r.candidate}</strong>
+                                  {isUnmatched ? (
+                                    <div className="retention-badges">
+                                      <span className={`retention-badge ${r.retention_type}`}>
+                                        {r.retention_type === "unmatched_left" ? "Unmatched Left" : "Unmatched Right"}
+                                      </span>
+                                      {r.unestablished_reason && (
+                                        <span className={`reason-badge reason-${r.unestablished_reason}`} title={`Unestablished reason: ${r.unestablished_reason}`}>
+                                          {r.unestablished_reason.replace("_", " ")}
+                                        </span>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <small>Cluster {r.cluster}</small>
+                                  )}
+                                  {diffMode && r.diff_status && (
+                                    <span className={`diff-badge diff-badge-${r.diff_status}`}>
+                                      {r.diff_status === "added" && "+ Added"}
+                                      {r.diff_status === "changed" && "Δ Changed"}
+                                      {r.diff_status === "withdrawn" && "- Withdrawn"}
+                                      {r.diff_status === "unchanged" && "= Unchanged"}
+                                      {r.diff_status === "not_reviewed" && "Not reviewed"}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              {allFields ? (
+                                leftCols.map((c, i) => {
+                                  const val = r.left_columns?.[c.index] === c.name ? r.left_cells?.[c.index] : "—";
+                                  return (
+                                    <td key={i}>
+                                      {val === "[OUTER_NULL]" || r.is_outer_left_null ? (
+                                        <span className="outer-null-tag">[OUTER_NULL]</span>
+                                      ) : (
+                                        val || "—"
+                                      )}
+                                    </td>
+                                  );
+                                })
+                              ) : (
+                                <td>
+                                  {r.is_outer_left_null || r.left_value === "[OUTER_NULL]" ? (
+                                    <span className="outer-null-tag">[OUTER_NULL]</span>
+                                  ) : (
+                                    r.left_value
+                                  )}
+                                </td>
+                              )}
+                              <td>
+                                {r.relation === "UNESTABLISHED" ? (
+                                  <span className="semantic-relation unestablished" title="No relationship established for this unmatched row">
+                                    UNESTABLISHED
+                                  </span>
+                                ) : (
+                                  <span
+                                    className={`semantic-relation ${r.relation}`}
+                                    style={getPredicateStyle(r.relation)}
+                                  >
+                                    {label(r.relation)}
                                   </span>
                                 )}
-                              </div>
-                            </td>
-                            {allFields ? (
-                              leftCols.map((c, i) => (
-                                <td key={i}>
-                                  {r.left_columns[c.index] === c.name
-                                    ? r.left_cells[c.index] || "—"
-                                    : "—"}
-                                </td>
-                              ))
-                            ) : (
-                              <td>{r.left_value}</td>
-                            )}
-                            <td>
-                              <span
-                                className={`semantic-relation ${r.relation}`}
-                                style={getPredicateStyle(r.relation)}
-                              >
-                                {label(r.relation)}
-                              </span>
-                              {r.direction && r.direction !== "undirected" && (
-                                <small className="direction-badge" style={{ display: "block", color: "#666", fontSize: "0.8em", marginTop: "2px" }}>
-                                  {r.direction === "a_to_b" ? "A → B" : r.direction === "b_to_a" ? "B → A" : r.direction === "bidirectional" ? "A ↔ B" : r.direction}
-                                </small>
+                                {r.direction && r.direction !== "undirected" && (
+                                  <small className="direction-badge" style={{ display: "block", color: "#666", fontSize: "0.8em", marginTop: "2px" }}>
+                                    {r.direction === "a_to_b" ? "A → B" : r.direction === "b_to_a" ? "B → A" : r.direction === "bidirectional" ? "A ↔ B" : r.direction}
+                                  </small>
+                                )}
+                                {diffMode && r.diff_notes && (
+                                  <small className="diff-row-notes">{r.diff_notes}</small>
+                                )}
+                              </td>
+                              {allFields ? (
+                                rightCols.map((c, i) => {
+                                  const val = r.right_columns?.[c.index] === c.name ? r.right_cells?.[c.index] : "—";
+                                  return (
+                                    <td key={i}>
+                                      {val === "[OUTER_NULL]" || r.is_outer_right_null ? (
+                                        <span className="outer-null-tag">[OUTER_NULL]</span>
+                                      ) : (
+                                        val || "—"
+                                      )}
+                                    </td>
+                                  );
+                                })
+                              ) : (
+                                <>
+                                  <td>
+                                    {r.is_outer_right_null || r.right_value === "[OUTER_NULL]" ? (
+                                      <span className="outer-null-tag">[OUTER_NULL]</span>
+                                    ) : (
+                                      r.right_value
+                                    )}
+                                  </td>
+                                  <td>
+                                    {r.is_outer_right_null ? (
+                                      <span className="outer-null-tag">[OUTER_NULL]</span>
+                                    ) : (
+                                      (() => {
+                                        if (isClinical) {
+                                          const clinical = ["dosage", "unit", "route"]
+                                            .map((c: string) => r.right_cells?.[r.right_columns?.findIndex((n: string) => n.toLowerCase() === c)])
+                                            .filter(Boolean)
+                                            .join(" · ");
+                                          if (clinical) return clinical;
+                                        }
+                                        const others = (r.right_columns || [])
+                                          .map((name: string, i: number) => ({ name, val: r.right_cells?.[i] }))
+                                          .filter((c: { name: string; val: any }, i: number) => c.val && c.val !== r.right_value && c.val !== "[OUTER_NULL]" && i !== 0)
+                                          .map((c: { name: string; val: any }) => `${c.name}: ${c.val}`)
+                                          .join(" · ");
+                                        return others || "—";
+                                      })()
+                                    )}
+                                  </td>
+                                </>
                               )}
-                              {diffMode && r.diff_notes && (
-                                <small className="diff-row-notes">{r.diff_notes}</small>
-                              )}
-                            </td>
-                            {allFields ? (
-                              rightCols.map((c, i) => (
-                                <td key={i}>
-                                  {r.right_columns[c.index] === c.name
-                                    ? r.right_cells[c.index] || "—"
-                                    : "—"}
-                                </td>
-                              ))
-                            ) : (
-                              <>
-                                <td>{r.right_value}</td>
-                                <td>
-                                  {(() => {
-                                    if (isClinical) {
-                                      const clinical = ["dosage", "unit", "route"]
-                                        .map((c) => r.right_cells[r.right_columns.findIndex((n) => n.toLowerCase() === c)])
-                                        .filter(Boolean)
-                                        .join(" · ");
-                                      if (clinical) return clinical;
+                              <td>
+                                {isUnmatched ? (
+                                  <span className="outer-evidence-muted">{r.evidence_quote}</span>
+                                ) : (
+                                  <>
+                                    <mark>{r.evidence_quote}</mark>
+                                    <small>
+                                      {r.evidence_count} supporting passage
+                                      {r.evidence_count === 1 ? "" : "s"}
+                                      {r.path_count
+                                        ? ` · ${r.path_count} sentence paths`
+                                        : ""}
+                                    </small>
+                                  </>
+                                )}
+                              </td>
+                              <td>
+                                {isUnmatched ? (
+                                  <span className="trace-muted">—</span>
+                                ) : (
+                                  <button
+                                    onClick={() =>
+                                      onEvidence(r.left_link, r.right_link)
                                     }
-                                    const others = r.right_columns
-                                      .map((name, i) => ({ name, val: r.right_cells[i] }))
-                                      .filter((c, i) => c.val && c.val !== r.right_value && i !== 0)
-                                      .map((c) => `${c.name}: ${c.val}`)
-                                      .join(" · ");
-                                    return others || "—";
-                                  })()}
-                                </td>
-                              </>
-                            )}
-                            <td>
-                              <mark>{r.evidence_quote}</mark>
-                              <small>
-                                {r.evidence_count} supporting passage
-                                {r.evidence_count === 1 ? "" : "s"}
-                                {r.path_count
-                                  ? ` · ${r.path_count} sentence paths`
-                                  : ""}
-                              </small>
-                            </td>
-                            <td>
-                              <button
-                                onClick={() =>
-                                  onEvidence(r.left_link, r.right_link)
-                                }
-                              >
-                                Inspect evidence
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                                  >
+                                    Inspect evidence
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                     {!rows.length && (
@@ -811,9 +1063,10 @@ export function SemanticResults({
       )}
       <CombineRelationshipsModal
         isOpen={remapModalOpen}
-        onClose={() => setRemapModalOpen(false)}
+        onClose={() => { setRemapModalOpen(false); if (mergeSuggestion) setResumeReview(old => ({panel: mergeSuggestion.kind === 'structural' ? 'pairs' : 'meanings', serial: (old?.serial || 0) + 1})); }}
         plan={plan}
         initialSources={remapModalSources}
+        suggestion={mergeSuggestion}
         onPlanUpdated={(updated) => {
           const newRelations = [...new Set(updated.output.map((r) => r.relation))];
           if (relation !== "all" && !newRelations.includes(relation)) {

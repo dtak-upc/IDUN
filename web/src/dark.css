@@ -2240,6 +2240,8 @@ body[data-theme="dark"] {
 }
 
 /* Page & Tab Titles in Dark Mode */
+[data-theme="dark"] .dw-heading h1,
+[data-theme="dark"] .dw h1,
 [data-theme="dark"] .live-discovery h1,
 [data-theme="dark"] .live-discovery header h1,
 [data-theme="dark"] .live-discovery > header h1,
@@ -4344,3 +4346,223 @@ body[data-theme="dark"] {
   border-top-color: #1e293b;
   color: #64748b;
 }
+
+/* ==========================================================================
+   THOR Augmentation Workspace in Dark Mode
+   ========================================================================== */
+[data-theme="dark"] .thor-heading,
+[data-theme="dark"] header.thor-heading,
+[data-theme="dark"] .thor-workspace > header {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: none !important;
+}
+
+[data-theme="dark"] .thor-heading h1 {
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .thor-heading p {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .thor-stage {
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+/* ==========================================================================
+   Outer Integration Views & Retention Policy in Dark Mode (Stage 11.E)
+   ========================================================================== */
+
+[data-theme="dark"] .outer-policy-toolbar {
+  background: #0f172a;
+  border-color: #1e293b;
+}
+
+[data-theme="dark"] .outer-policy-label {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .outer-policy-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .outer-policy-btn:hover {
+  background: #334155;
+  border-color: #475569;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .outer-policy-btn.active {
+  background: #2563eb;
+  border-color: #3b82f6;
+  color: #ffffff;
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.4);
+}
+
+[data-theme="dark"] .outer-scope-card {
+  background: #0d1526;
+  border-color: #1e293b;
+  border-left-color: #3b82f6;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .outer-scope-badge {
+  background: #1e3a8a;
+  color: #93c5fd;
+  border-color: #2563eb;
+}
+
+[data-theme="dark"] .outer-scope-header h4 {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .outer-scope-counts-summary {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .outer-scope-counts-detail {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .outer-scope-tables-grid {
+  background: #070d18;
+  border-color: #1e293b;
+}
+
+[data-theme="dark"] .scope-table-title {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .scope-table-meta {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .outer-reasons-label {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .reason-pill {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .reason-pill code {
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .reason-pill.reason-not_searched {
+  background: #1e293b;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .reason-pill.reason-budget_limited {
+  background: #451a03;
+  border-color: #78350f;
+  color: #fde68a;
+}
+
+[data-theme="dark"] .reason-pill.reason-no_candidate {
+  background: #1f2937;
+  border-color: #374151;
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .reason-pill.reason-reviewed_unresolved {
+  background: #451a03;
+  border-color: #92400e;
+  color: #fef3c7;
+}
+
+[data-theme="dark"] .reason-pill.reason-reviewed_negative {
+  background: #450a0a;
+  border-color: #7f1d1d;
+  color: #fca5a5;
+}
+
+[data-theme="dark"] .outer-epistemic-notice {
+  background: #052e16;
+  border-color: #166534;
+  color: #86efac;
+}
+
+[data-theme="dark"] .outer-epistemic-notice svg {
+  color: #4ade80;
+}
+
+/* Unmatched Rows in Dark Mode */
+[data-theme="dark"] .semantic-row.outer-unmatched-row {
+  background: #090f1d;
+}
+
+[data-theme="dark"] .semantic-row.outer-unmatched-row:hover {
+  background: #0f172a;
+}
+
+[data-theme="dark"] .retention-badge.unmatched_left {
+  background: #1e3a8a;
+  color: #93c5fd;
+  border-color: #2563eb;
+}
+
+[data-theme="dark"] .retention-badge.unmatched_right {
+  background: #4a044e;
+  color: #f0abfc;
+  border-color: #701a75;
+}
+
+[data-theme="dark"] .reason-badge.reason-not_searched {
+  background: #1e293b;
+  color: #94a3b8;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .reason-badge.reason-budget_limited {
+  background: #451a03;
+  color: #fde68a;
+  border-color: #78350f;
+}
+
+[data-theme="dark"] .reason-badge.reason-no_candidate {
+  background: #1f2937;
+  color: #9ca3af;
+  border-color: #374151;
+}
+
+[data-theme="dark"] .reason-badge.reason-reviewed_unresolved {
+  background: #451a03;
+  color: #fef3c7;
+  border-color: #92400e;
+}
+
+[data-theme="dark"] .reason-badge.reason-reviewed_negative {
+  background: #450a0a;
+  color: #fca5a5;
+  border-color: #7f1d1d;
+}
+
+[data-theme="dark"] .outer-null-tag {
+  color: #64748b;
+  background: #0f172a;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .semantic-relation.unestablished {
+  background: #0f172a !important;
+  color: #64748b !important;
+  border-color: #334155 !important;
+}
+
+[data-theme="dark"] .outer-evidence-muted {
+  color: #64748b;
+}
+
+[data-theme="dark"] .trace-muted {
+  color: #334155;
+}
+

@@ -1,3 +1,4 @@
+import { effectivePromptSchema, presetSchema, reservedOutcomes } from "../settings/promptSchema";
 import { useState, useEffect, useRef } from "react";
 import { api, post } from "../storage/api";
 import "./integration.css";
@@ -112,6 +113,7 @@ export function RelationshipSchemaStudio({
   if (!isOpen) return null;
 
   const activeLabels = new Set(localConfig.labels);
+  const standardLabels = localConfig.prompt_id === "clinical-preset-v1" ? DEFAULT_LABELS : reservedOutcomes;
 
   const toggleLabel = (label: string, defaultDef?: string) => {
     const updated = new Set(localConfig.labels);
@@ -184,12 +186,12 @@ export function RelationshipSchemaStudio({
     }
   };
 
-  const resetToDefaults = () => {
-    setLocalConfig({
-      mode: "strict",
-      labels: [...DEFAULT_LABELS],
-      definitions: {},
-    });
+  const resetToDefaults = async () => {
+    try {
+      const pid=localConfig.prompt_id || "generic-evidence-v1";
+      const preset=await api<SchemaConfig>(`/settings/prompts/${pid}`);
+      setLocalConfig(presetSchema(pid,preset,localConfig.mode));
+    } catch (error) { setProbeError(String(error)); }
   };
 
   return (
@@ -279,7 +281,7 @@ export function RelationshipSchemaStudio({
                   name="schema-mode"
                   value="open"
                   checked={localConfig.mode === "open"}
-                  onChange={() => setLocalConfig({ ...localConfig, mode: "open" })}
+                  onChange={() => setLocalConfig(effectivePromptSchema({ ...localConfig, mode: "open" }))}
                 />
                 <div className="schema-mode-content">
                   <strong>Fully Open</strong>
@@ -450,7 +452,8 @@ export function RelationshipSchemaStudio({
                   { label: "CONTRAINDICATED", desc: "Medication unsafe/inappropriate for this diagnosis/context." },
                   { label: "NEGATIVE", desc: "Evidence indicates medication is for a different diagnosis." },
                   { label: "UNRESOLVED", desc: "Insufficient evidence in narrative to determine relationship." },
-                ].map((p) => {
+                ].filter((p) => standardLabels.includes(p.label)).map((p) => {
+                  if (localConfig.prompt_id !== "clinical-preset-v1") p = { ...p, desc: p.label === "NEGATIVE" ? "Evidence explicitly rejects a relationship between the records." : "Insufficient evidence to determine a relationship." };
                   const isSelected = activeLabels.has(p.label);
                   const isEssential = p.label === "NEGATIVE" || p.label === "UNRESOLVED";
                   return (
@@ -481,7 +484,7 @@ export function RelationshipSchemaStudio({
               <span className="schema-section-title">Custom User Predicates</span>
               <div className="schema-custom-chips">
                 {localConfig.labels
-                  .filter((l) => !DEFAULT_LABELS.includes(l))
+                  .filter((l) => !standardLabels.includes(l))
                   .map((l) => (
                     <span key={l} className="schema-custom-chip">
                       <code>{l}</code>
@@ -494,7 +497,7 @@ export function RelationshipSchemaStudio({
                       </button>
                     </span>
                   ))}
-                {localConfig.labels.filter((l) => !DEFAULT_LABELS.includes(l)).length === 0 && (
+                {localConfig.labels.filter((l) => !standardLabels.includes(l)).length === 0 && (
                   <p className="schema-empty-custom">
                     No custom predicates added yet. Type below or add from discovered suggestions above.
                   </p>
@@ -504,7 +507,7 @@ export function RelationshipSchemaStudio({
               <form onSubmit={addCustomPredicate} className="schema-custom-form">
                 <input
                   type="text"
-                  placeholder="e.g. PROPHYLAXIS_FOR or OFF_LABEL_USE"
+                  placeholder="e.g. PART_OF or LOCATED_IN"
                   value={customTag}
                   maxLength={40}
                   onChange={(e) => setCustomTag(e.target.value)}
@@ -569,7 +572,7 @@ export function RelationshipSchemaStudio({
                 setSaving(true);
                 setProbeError("");
                 try {
-                  await onSave(localConfig);
+                  await onSave(effectivePromptSchema(localConfig));
                   onClose();
                 } catch (error) {
                   setProbeError(`Could not save schema: ${String(error)}`);

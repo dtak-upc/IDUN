@@ -62,23 +62,23 @@ export function Workbench({
     <div className="evidence-workbench">
       <div className="example-banner">
         <div>
-          <strong>Illustrative evidence workspace</strong>
+          <strong>Illustrative Evidence Workspace</strong>
           <span>
             Synthetic records and narratives · No model inference or
             materialization has run.
           </span>
         </div>
         <button className="text-button" onClick={onDiscover}>
-          Back to discovery
+          Back to Discovery
         </button>
       </div>
       <div className="workbench-heading">
         <div>
           <span className="eyebrow">THE EVIDENCE ROOM</span>
-          <h2>Evidence workbench</h2>
+          <h2>Evidence Workbench</h2>
         </div>
         <label>
-          Example view
+          Example View
           <select
             aria-label="Example view"
             value={view}

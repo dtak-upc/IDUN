@@ -1,0 +1,45 @@
+import {useEffect,useState,useRef} from 'react';
+import {inferenceUnavailable} from '../mode';
+import {MappingExamples,type ExampleGroup} from './MappingExamples';
+import {MappingPreview} from './MappingPreview';
+type Family='concept'|'property'|'attribute';
+type Graph={revision:string;concepts:{id:string;label:string}[];relationships:{id:string;label:string;source:string;target:string;direction:string}[];attributes?:{id:string;concept:string;name:string;datatype:string}[];layers:{update_available:boolean}[]};
+type Suggestion={family?:Family;id:string;source:string;target:string;kind:string;reason:string;status:string;accepted:boolean;stale:boolean;labels:Record<string,string>;model:string};
+type Saved={items:Suggestion[];batches:{family?:Family;id:string;count:number;created:number;model:string}[]};
+type Preview={token:string;relationships?:number;attribute_conflicts?:string[];endpoints?:{left:string;right:string;same:boolean}[];examples:ExampleGroup[]};
+export function AlignmentSuggestions({graph,runs,disabled,activeRequest,post,onStarted,onChanged}:{graph:Graph;runs:string[];disabled:boolean;activeRequest:boolean;post:<T>(path:string,body:unknown)=>Promise<T>;onStarted:()=>void;onChanged:()=>void}){
+ const [family,setFamily]=useState<Family>('concept'),[search,setSearch]=useState(''),[compatible,setCompatible]=useState(false);
+ const items=family==='concept'?graph.concepts:family==='property'?graph.relationships.map(e=>({...e,label:`${e.label} · ${graph.concepts.find(c=>c.id===e.source)?.label} ${e.direction==='directed'?'→':'—'} ${graph.concepts.find(c=>c.id===e.target)?.label}`})):(graph.attributes??[]).map(a=>({...a,label:`${graph.concepts.find(c=>c.id===a.concept)?.label} · ${a.name} (${a.datatype})`}));
+ const [selected,setSelected]=useState<string[]>([]),[saved,setSaved]=useState<Saved>(),[error,setError]=useState(''),[pending,setPending]=useState(false),[epoch,setEpoch]=useState(0);
+ const [reviewTab,setReviewTab]=useState<'mapping'|'evidence'>('mapping');
+ const reviewPanel=useRef<HTMLElement>(null);
+ const [review,setReview]=useState<{item:Suggestion;preview:Preview}>();
+ useEffect(()=>{let live=true;setReview(undefined);void post<Saved>('alignment-suggestions',{runs}).then(s=>{if(live)setSaved(s);}).catch(e=>{if(live)setError(String(e));});return()=>{live=false;};},[post,graph.revision,epoch]);
+ useEffect(()=>setSelected(v=>v.filter(id=>items.some(c=>c.id===id))),[graph.revision,family]);
+ useEffect(()=>{if(review){reviewPanel.current?.scrollIntoView({block:'start',behavior:'auto'});reviewPanel.current?.focus({preventScroll:true});}},[review]);
+ const latestBatch=saved?.batches.find(b=>(b.family??'concept')===family);
+ const locked=disabled||pending;
+ async function action(path:string,item?:Suggestion,status?:string){setPending(true);setError('');try{
+ const result=await post<Preview>(path,{runs,revision:graph.revision,concepts:selected,family,compatible,id:item?.id,status,token:review?.preview.token});
+ if(path==='suggest-alignments')onStarted();
+ else if(path==='preview-suggestion'&&item){setCompatible(false);setReviewTab('mapping');setReview({item,preview:result});}
+ else {setReview(undefined);setEpoch(v=>v+1);if(path==='apply-suggestion')onChanged();}
+ }catch(e){setError(String(e));setReview(undefined);}finally{setPending(false);}}
+ return <section className="kg-layer-comparison kg-suggestions"><h3>Find connections across your schema</h3>
+ <p>Choose what to compare, then review evidence before adding a mapping.</p>
+ <div className="kg-task-tabs" aria-label="Suggestion category">{([['concept','Concepts'],['property','Relationships'],['attribute','Attributes']] as const).map(([id,label])=><button key={id} aria-pressed={family===id} disabled={locked} onClick={()=>{setFamily(id);setSelected([]);setReview(undefined);setSearch('');}}>{label}</button>)}</div>
+ <p>{family==='concept'?'Compare class meaning and specialization.':family==='property'?'Compare equivalent or inverse relationships. Set their directions in Directions first.':'Compare attribute meaning and units. Matching data types alone do not establish equivalence.'}</p>
+ <label>Find {family==='property'?'relationships':family==='attribute'?'attributes':'concepts'}<input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search your schema"/></label>
+ <div className="kg-alignment-picker">{items.filter(c=>c.label.toLowerCase().includes(search.toLowerCase())).map(c=><button key={c.id} aria-pressed={selected.includes(c.id)} disabled={locked||(!selected.includes(c.id)&&selected.length>=8)||(family==='property'&&graph.relationships.find(e=>e.id===c.id)?.direction!=='directed')} onClick={()=>setSelected(v=>v.includes(c.id)?v.filter(id=>id!==c.id):[...v,c.id])}>{c.label}<small>{selected.includes(c.id)?'Selected':family==='property'&&graph.relationships.find(e=>e.id===c.id)?.direction!=='directed'?'Set direction first':'Compare'}</small></button>)}</div>
+ <p>{selected.length} of 8 selected · Choose at least two items.</p>
+ <button disabled={inferenceUnavailable||locked||graph.layers.some(l=>l.update_available)||selected.length<2} onClick={()=>void action('suggest-alignments')}>Suggest alignments · {selected.length} selected</button>
+ {activeRequest&&<button disabled={pending} onClick={()=>void action('cancel-alignments')}>Cancel alignment request</button>}
+ {graph.layers.some(l=>l.update_available)&&<p>Review pending Integration updates before requesting new suggestions. Saved suggestions remain available below.</p>}
+ <p>Uses the configured LLM and the matching alignment prompt in Settings. Saved decisions survive subsequent requests. Showing the latest 100 suggestions.</p>
+ {error&&<p role="alert">{error}</p>}{saved&&!saved.items.some(i=>(i.family??'concept')===family)&&<p>No saved suggestions yet.</p>}
+ {latestBatch&&<p>Latest request: {latestBatch.count} proposals returned · {latestBatch.model} · {new Date(latestBatch.created*1000).toLocaleString()}</p>}
+ {saved?.items.filter(i=>(i.family??'concept')===family).map(item=><article className="kg-suggestion-card" key={item.id}><strong>{item.labels[item.source]} {item.kind==='equivalent'?'≡':item.kind==='inverse'?'⇄':'⊆'} {item.labels[item.target]}</strong><small>{item.accepted?'Accepted mapping':item.status} · {item.model}{item.stale?' · Original scope unavailable or changed':''}</small><p>{item.reason}</p>
+ {!item.accepted&&<div className="kg-suggestion-actions">{item.status==='pending'?<><button disabled={locked||item.stale} onClick={()=>void action('preview-suggestion',item)}>Review suggestion</button><button disabled={locked} onClick={()=>void action('decide-suggestion',item,'deferred')}>Defer</button><button disabled={locked} onClick={()=>void action('decide-suggestion',item,'rejected')}>Reject</button></>:<button disabled={locked} onClick={()=>void action('decide-suggestion',item,'pending')}>Reopen suggestion</button>}</div>}</article>)}
+ {review&&<section ref={reviewPanel} tabIndex={-1} className="kg-revision-notice kg-alignment-review" aria-label="LLM alignment review"><strong>{review.item.labels[review.item.source]} {review.item.kind==='equivalent'?'is equivalent to':review.item.kind==='inverse'?'is inverse to':'is a subclass of'} {review.item.labels[review.item.target]}</strong><p>{review.preview.relationships!==undefined?`${review.preview.relationships} schema relationships touch these concepts. `:''} Adds an ontology axiom; no records are merged and Integration labels stay unchanged. {(review.item.family??'concept')==='concept'?'Instances can use this class mapping when you choose Include reviewed mappings.':review.item.family==='property'?'Instances can include this mapping with Include equivalent & inverse.':'Instances can include this mapping using reviewed equivalent attributes.'}</p>{!!review.preview.attribute_conflicts?.length&&<p>Different declared attribute types: {review.preview.attribute_conflicts?.join(', ')}. No conversion will be applied.</p>}{review.preview.endpoints?.map((e,i)=><p key={i}>Endpoint {i+1}: {e.left} ↔ {e.right}{!e.same?' · different classes; review compatibility':''}</p>)}<div className="kg-task-tabs" aria-label="Review view"><button aria-pressed={reviewTab==='mapping'} onClick={()=>setReviewTab('mapping')}>01 · Compare mapping</button><button aria-pressed={reviewTab==='evidence'} onClick={()=>setReviewTab('evidence')}>02 · Inspect evidence</button></div>{reviewTab==='mapping'?<MappingPreview graph={graph} proposal={review.item}/>:<MappingExamples groups={review.preview.examples}/>}{review.item.family==='attribute'&&<label><input type="checkbox" checked={compatible} onChange={e=>setCompatible(e.target.checked)}/>I verified matching meaning, units and value representation.</label>}<button disabled={locked||(review.item.family==='attribute'&&!compatible)} onClick={()=>void action('apply-suggestion',review.item)}>Accept reviewed alignment</button><button disabled={locked} onClick={()=>setReview(undefined)}>Cancel review</button></section>}
+ </section>;
+}

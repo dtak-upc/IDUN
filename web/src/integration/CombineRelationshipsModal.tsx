@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { relationshipMergeScope } from "./relationshipMergeScope";
 import { post } from "../storage/api";
 import type { SemanticPlan } from "./SemanticResults";
 
@@ -7,6 +8,7 @@ export interface CombineRelationshipsModalProps {
   onClose: () => void;
   plan: SemanticPlan;
   initialSources?: string[];
+  suggestion?: {target:string;kind:'equivalent'|'direction_review'|'structural'};
   onPlanUpdated?: (updated: SemanticPlan) => void;
 }
 
@@ -15,15 +17,15 @@ export function CombineRelationshipsModal({
   onClose,
   plan,
   initialSources = [],
+  suggestion,
   onPlanUpdated,
 }: CombineRelationshipsModalProps) {
   const availableRelations = Array.from(
     new Set([
-      ...(plan.output ? plan.output.map((r) => r.relation) : []),
-      ...(plan.decisions ? plan.decisions.flatMap((d) => d.relations || []) : []),
+      ...(plan.output ? plan.output.map((r) => r.relation) : (plan.decisions || []).flatMap(d => d.relations || [])),
     ])
   )
-    .filter(Boolean)
+    .filter(name => Boolean(name) && !['NEGATIVE', 'UNRESOLVED'].includes(name))
     .sort();
 
   const [tab, setTab] = useState<"combine" | "rename">(
@@ -36,12 +38,18 @@ export function CombineRelationshipsModal({
   const [addToSchema, setAddToSchema] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [directionsReviewed, setDirectionsReviewed] = useState(false);
+  const [meaningsConfirmed, setMeaningsConfirmed] = useState(false);
+  const [expectedRevision, setExpectedRevision] = useState<string | undefined>();
 
   // Sync state when modal opens or initialSources change
   useEffect(() => {
     if (!isOpen) return;
     setError("");
     setSubmitting(false);
+    setDirectionsReviewed(false);
+    setMeaningsConfirmed(false);
+    setExpectedRevision(plan.content_revision);
 
     const isSingle = initialSources.length === 1;
     setTab(isSingle ? "rename" : "combine");
@@ -58,14 +66,14 @@ export function CombineRelationshipsModal({
       setSelectedSources(initialSources);
       setRenameSource(initialSources[0] || availableRelations[0] || "");
       setDefinition("");
-      setTargetName("");
+      setTargetName(suggestion?.target || "");
     } else {
       setSelectedSources([]);
       setRenameSource(availableRelations[0] || "");
       setDefinition("");
       setTargetName("");
     }
-  }, [isOpen, initialSources]);
+  }, [isOpen, initialSources, suggestion]);
 
   // Handle escape key
   useEffect(() => {
@@ -90,9 +98,18 @@ export function CombineRelationshipsModal({
     canonicalRegex.test(trimmedTarget) &&
     !["NEGATIVE", "UNRESOLVED"].includes(trimmedTarget);
 
+  const mergeScope = relationshipMergeScope(plan, tab === "combine" ? selectedSources : [renameSource], trimmedTarget);
+  const participatingRelations = tab === 'combine' ? selectedSources.filter(name => availableRelations.includes(name)) : availableRelations.filter(name => name === renameSource);
+  const definitionSources = Array.from(new Set([...(tab === 'combine' ? selectedSources : [renameSource]), ...(availableRelations.includes(trimmedTarget) ? [trimmedTarget] : [])]));
+  const existingDefinitions = Array.from(new Set(definitionSources.map(name => plan.schema_config?.definitions?.[name]?.trim()).filter(Boolean)));
+  const needsDefinition = existingDefinitions.length > 1 && !definition.trim();
   const canSubmit =
+    !mergeScope.reason &&
+    !needsDefinition &&
     !submitting &&
     isTargetValid &&
+    (suggestion?.kind !== "direction_review" || directionsReviewed) &&
+    (suggestion?.kind !== "structural" || meaningsConfirmed) &&
     (tab === "combine"
       ? selectedSources.length >= 2
       : Boolean(renameSource) && renameSource !== trimmedTarget);
@@ -132,6 +149,7 @@ export function CombineRelationshipsModal({
       const updated = await post<SemanticPlan>(`/integration/${plan.id}/relationships`, {
         sources,
         target,
+        expected_revision: expectedRevision,
         definition: definition.trim() || undefined,
         add_to_schema: addToSchema,
       });
@@ -159,7 +177,7 @@ export function CombineRelationshipsModal({
       >
         <div className="lake-modal-header combine-rel-header">
           <div className="combine-rel-header-content">
-            <h3 id="combine-rel-modal-title">Combine or Rename Relationships</h3>
+            <h3 id="combine-rel-modal-title">{suggestion ? "Accept suggested merge" : "Combine or Rename Relationships"}</h3>
             <p className="lake-modal-desc">
               Consolidate predicted relationships into a single predicate or assign
               a custom user-defined name for this integration run. Changes apply
@@ -208,6 +226,17 @@ export function CombineRelationshipsModal({
 
         <form onSubmit={handleSubmit}>
           <div className="lake-modal-body combine-rel-modal-body">
+            {suggestion && <div className="semantic-merge-impact">
+              <strong>{selectedSources.reduce((sum, rel) => sum + countFor(rel), 0)} output rows use these labels in this run.</strong>
+              <p>Choose an existing name or enter a new name below. Source records and evidence are preserved. Relationship directions are unchanged.</p>
+              {suggestion.kind === 'structural' && <>
+                <p>These labels overlap on shared records; this is not an LLM judgment of equivalent meanings. The merge applies to every occurrence of the selected labels throughout this run.</p>
+                <label className="combine-checkbox-label"><input type="checkbox" checked={meaningsConfirmed} onChange={e => setMeaningsConfirmed(e.target.checked)}/><span>I confirm these labels mean the same relationship and want to keep their current directions.</span></label>
+              </>}
+              {suggestion.kind === 'direction_review' && <label className="combine-checkbox-label"><input type="checkbox" checked={directionsReviewed} onChange={e => setDirectionsReviewed(e.target.checked)}/><span>I reviewed the directions and want to keep them when merging the names.</span></label>}
+            </div>}
+            {!!mergeScope.tables.length && <p className="semantic-merge-impact"><strong>Source table pair</strong> · {mergeScope.tables.map(t=>t.name).join(' ↔ ')}<br /><small>Matching tables does not establish equivalent meanings. Review the definitions and evidence.</small></p>}
+            {!!mergeScope.reason && <p className="combine-rel-error-alert" role="status">{mergeScope.reason}</p>}
             {error && (
               <div className="combine-rel-error-alert" role="alert">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -293,6 +322,13 @@ export function CombineRelationshipsModal({
 
             {/* Target Predicate Name */}
             <div className="combine-field-group">
+              <label htmlFor="combine-existing-target">Keep an existing relationship name</label>
+              <select id="combine-existing-target" className="combine-rel-select" value={participatingRelations.includes(trimmedTarget) ? trimmedTarget : ''}
+                onChange={e => {setTargetName(e.target.value);}}>
+                <option value="">Enter a new name below</option>
+                {participatingRelations.map(name => <option key={name} value={name}>{name}</option>)}
+              </select>
+              <span className="combine-field-tip">Choose a participating label or write a new name below. Existing target names remain subject to the source-table-pair check.</span>
               <label htmlFor="combine-target-input">
                 Target Canonical Predicate Name:
               </label>
@@ -321,7 +357,7 @@ export function CombineRelationshipsModal({
             {/* Relationship Definition */}
             <div className="combine-field-group">
               <label htmlFor="combine-def-input">
-                Predicate Definition (optional):
+                Predicate Definition {existingDefinitions.length > 1 ? '(required for conflicting definitions)' : '(optional)'}:
               </label>
               <textarea
                 id="combine-def-input"
@@ -332,6 +368,12 @@ export function CombineRelationshipsModal({
                 maxLength={1200}
                 placeholder="Describe what this relationship represents (e.g. Drug is therapeutically indicated or prescribed for the diagnosed condition)..."
               />
+              {existingDefinitions.length > 1 && <div className="combine-definition-choices">
+                <small>These definitions differ. Choose one to keep, or write the combined meaning above.</small>
+                {definitionSources.filter(name=>plan.schema_config?.definitions?.[name]?.trim()).map(name => <button type="button" key={name} aria-pressed={definition.trim()===plan.schema_config!.definitions![name].trim()}
+                  onClick={()=>setDefinition(plan.schema_config!.definitions![name])}><strong>{name}</strong><span>{plan.schema_config!.definitions![name]}</span></button>)}
+              </div>}
+              {needsDefinition && <small role="status">Choose or write a definition before accepting this merge.</small>}
             </div>
 
             {/* Add to Lake Schema Checkbox */}
@@ -372,7 +414,7 @@ export function CombineRelationshipsModal({
               {submitting
                 ? "Applying changes..."
                 : tab === "combine"
-                ? `Combine ${selectedSources.length} Relationships`
+                ? suggestion ? "Accept merge" : `Combine ${selectedSources.length} Relationships`
                 : `Rename to ${trimmedTarget || "..."}`}
             </button>
           </div>
