@@ -2203,3 +2203,9 @@
 .profiling-selection span { overflow-wrap: anywhere; }
 .profiling-selection small { grid-column: 1 / -1; }
 @media (max-width: 760px) { .profiling-selection { grid-template-columns: 1fr; } }
+[data-theme="dark"] .profiling-selection,
+[data-theme="dark"] .reranker-selection {
+  background: #111827;
+  border-color: #374151;
+  color: #f8fafc;
+}
