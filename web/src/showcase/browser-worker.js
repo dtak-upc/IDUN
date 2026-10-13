@@ -3,15 +3,15 @@ let runtime;
 const initialized=new Set();
 const changes=new Map();
 let queue=Promise.resolve();
-async function start(base){
+async function start(base,revision){
   if(!runtime) runtime=(async()=>{
     const {loadPyodide}=await import(/* @vite-ignore */ base+'runtime/pyodide.mjs');
     const py=await loadPyodide({indexURL:base+'runtime/'});
-    const code=await fetch(base+'demo/runtime.zip').then(r=>{if(!r.ok)throw Error('Workspace runtime unavailable');return r.arrayBuffer();});
+    const code=await fetch(base+'demo/runtime.zip'+(revision?'?v='+encodeURIComponent(revision):''),{cache:revision?'default':'no-cache'}).then(r=>{if(!r.ok)throw Error('Workspace runtime unavailable');return r.arrayBuffer();});
     py.unpackArchive(code,'zip',{extractDir:'/app'});
     py.runPython("import sys, json; sys.path.insert(0, '/app/backend'); import static_runtime");
     return py;
-  })();
+  })().catch(e=>{runtime=undefined;throw e;});
   return runtime;
 }
 function database(){return new Promise((resolve,reject)=>{const r=indexedDB.open('idun-public-workspaces',1);r.onupgradeneeded=()=>r.result.createObjectStore('lakes');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
@@ -19,16 +19,16 @@ async function saved(key){const db=await database();try{return await new Promise
 async function persist(key,data){const db=await database();try{await new Promise((resolve,reject)=>{const tx=db.transaction('lakes','readwrite');tx.objectStore('lakes').put(data,key);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}finally{db.close();}}
 async function execute(message){
   if(self.IDUN_DEBUG)console.log('workspace start',message.lake.id,message.path);
-  const {base,lake,path,method,body}=message;const py=await start(base);
+  const {base,lake,path,method,body}=message;const py=await start(base,message.runtimeRevision);
   const key=lake.id+':'+lake.sha256;
   if(!initialized.has(key)){
-    const metadata=await fetch(base+'demo/'+lake.metadata).then(r=>r.json());
+    const metadata=await fetch(base+'demo/'+lake.metadata+'?v='+lake.sha256,{cache:'no-cache'}).then(r=>{if(!r.ok)throw Error('Saved source metadata unavailable');return r.json();});
     const previous=await saved(key);
     let bytes;
     if(!bytes){
       const pieces=[];
       for(const file of lake.workspace_parts?.length?lake.workspace_parts:[lake.workspace]){
-        const response=await fetch(base+'demo/'+file);if(!response.ok)throw Error('Saved lake unavailable');pieces.push(await response.arrayBuffer());
+        const response=await fetch(base+'demo/'+file+'?v='+lake.sha256);if(!response.ok)throw Error('Saved lake unavailable');pieces.push(await response.arrayBuffer());
       }
       const compressed=await new Blob(pieces).arrayBuffer();
       const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',compressed)),b=>b.toString(16).padStart(2,'0')).join('');

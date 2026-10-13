@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { LakeProfile, type ProfileWorkflowState } from '../inference/LakeProfile';
 import { InferenceReadiness } from '../inference/Readiness';
-import { savedDemo } from '../mode';
+import { savedDemo, staticWorkspace } from '../mode';
 import './workflow.css';
 import {CandidatePairs} from '../inference/CandidatePairs';
 import {ReviewScope} from '../inference/ReviewScope';
@@ -25,7 +25,7 @@ export function DataLakeWorkflow({ lakeId, lakeName, savedCount, queuedCount, ch
   return <section className="lake-workflow" aria-label="Data Lake workflow">
     <div className="lake-flow-heading journey-workspace-heading"><div><span className="eyebrow">DATA LAKE · {lakeName}</span>
       <h2>From Raw Files to Discovery</h2><p>Import your sources, understand their profiles, then explore where to look next.</p></div>
-      <DataJourneyButton stage="Data Lake" disabled={!savedDemo&&!ready}>{savedDemo?<SavedJourney lakeId={lakeId}/>:<ScopeJourney lakeId={lakeId}/>}</DataJourneyButton></div>
+      <DataJourneyButton stage="Data Lake" disabled={!savedDemo&&!staticWorkspace&&!ready}>{savedDemo?<SavedJourney lakeId={lakeId}/>:<ScopeJourney lakeId={lakeId}/>}</DataJourneyButton></div>
     <nav className="lake-flow-steps" role="tablist" aria-label="Data Lake steps" onKeyDown={event => {
       if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
       const tabs = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];

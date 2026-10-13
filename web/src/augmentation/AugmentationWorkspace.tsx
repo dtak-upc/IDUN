@@ -460,6 +460,8 @@ export function AugmentationWorkspace() {
             if (target.base_run_id) setRun(target.base_run_id);
             setStage('review');
             await loadProposalsAndViews(target.id, target.scope);
+          } else if (active && initialRequest === request.current) {
+            await restorePreparation('source','',initialRequest);
           }
         })
         .catch((e) => { if (active && initialRequest === request.current) setError(`Could not restore the saved augmentation run: ${e.message}`); });
@@ -989,7 +991,7 @@ export function AugmentationWorkspace() {
           </select>
           {augRun && (
             <span className="thor-active-run-pill">
-              Active: <code>{augRun.id.slice(0, 10)}</code> <button className="thor-sm-btn" disabled={inferenceUnavailable || extractBusy} onClick={removeRun}>Delete run</button>
+              Active: <code>{augRun.id.slice(0, 10)}</code> <button className="thor-sm-btn" disabled={savedDemo || extractBusy} onClick={removeRun}>Delete run</button>
             </span>
           )}
         </div>

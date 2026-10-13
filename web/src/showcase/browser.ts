@@ -1,6 +1,6 @@
 import {publicBase,publicFile} from './paths';
 type Lake={id:string;name:string;files:number;workspace:string;workspace_parts?:string[];metadata:string;sha256:string};
-type Manifest={default_id:string;lakes:Lake[]};
+type Manifest={default_id:string;lakes:Lake[];runtime_revision?:string};
 let manifest:Promise<Manifest>|undefined,worker:Worker|undefined,sequence=0;
 const waiting=new Map<number,{resolve:(v:unknown)=>void;reject:(e:Error)=>void}>();
 function start(){
@@ -10,14 +10,14 @@ function start(){
   }return worker;
 }
 export async function browserApi<T>(path:string,init?:RequestInit,lake=''):Promise<T>{
-  const m=await (manifest ||=fetch(publicFile('demo/lakes.json')).then(async r=>{if(!r.ok)throw Error('Saved lakes unavailable');return r.json() as Promise<Manifest>;}));
+  const m=await (manifest ||=fetch(publicFile('demo/lakes.json'),{cache:'no-cache'}).then(async r=>{if(!r.ok)throw Error('Saved lakes unavailable');return r.json() as Promise<Manifest>;}).catch(e=>{manifest=undefined;throw e;}));
   if(path==='/lakes'){
     if(init?.method && init.method!=='GET')throw Error('Select one of the published lakes. Importing new sources requires an inference backend.');
     return m as T;
   }
   const selected=m.lakes.find(l=>l.id===(lake||m.default_id));if(!selected)throw Error('Select a saved data lake.');
   const id=++sequence;const response=new Promise<unknown>((resolve,reject)=>waiting.set(id,{resolve,reject}));
-  start().postMessage({id,base:new URL(publicBase,location.href).href,lake:selected,path,method:init?.method||'GET',body:init?.body?JSON.parse(String(init.body)):{}});
+  start().postMessage({id,base:new URL(publicBase,location.href).href,runtimeRevision:m.runtime_revision,lake:selected,path,method:init?.method||'GET',body:init?.body?JSON.parse(String(init.body)):{}});
   return response as Promise<T>;
 }
 export async function browserDownload(path:string,lake:string){

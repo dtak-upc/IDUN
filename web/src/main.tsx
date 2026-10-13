@@ -327,7 +327,7 @@ function App({ lake, onLakeChange }: {lake?: Lake; onLakeChange?: (lake: Lake) =
                     ][i]
                   }
                 />
-                {item}
+                <span className="workspace-nav-label">{item}</span>
                 {item === "Data Lake" && queue.length > 0 && (
                   <span className="nav-count">{queue.length}</span>
                 )}

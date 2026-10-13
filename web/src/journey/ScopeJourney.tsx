@@ -4,8 +4,9 @@ import { ScopeHandoff, type ScopeSnapshot } from './ScopeHandoff';
 
 export function ScopeJourney({ lakeId }: { lakeId: string }) {
   const [scope,setScope]=useState<ScopeSnapshot>(),[error,setError]=useState('');
+  const [retry,setRetry]=useState(0);
   useEffect(()=>{
-    const controller=new AbortController();let active=true;
+    const controller=new AbortController();let active=true;setError('');setScope(undefined);
     (async()=>{
       const graph=await api<{graph:{generation:string}}>('/profile/graph',{signal:controller.signal},lakeId);
       const draft=JSON.parse(localStorage.getItem(`idun:graph-draft:${lakeId}`)||'null');
@@ -14,6 +15,6 @@ export function ScopeJourney({ lakeId }: { lakeId: string }) {
       if(active)setScope(result);
     })().catch(e=>{if(active)setError(String(e));});
     return()=>{active=false;controller.abort();};
-  },[lakeId]);
-  return error?<p role="alert">{error}</p>:scope?<ScopeHandoff scope={scope} lakeId={lakeId}/>:<p role="status">Loading your profiled scope…</p>;
+  },[lakeId,retry]);
+  return error?<div className="journey-notice"><p role="alert">{error}</p><button onClick={()=>setRetry(value=>value+1)}>Retry inspection</button></div>:scope?<ScopeHandoff scope={scope} lakeId={lakeId}/>:<p role="status">Opening your saved profiles and selected scope…</p>;
 }

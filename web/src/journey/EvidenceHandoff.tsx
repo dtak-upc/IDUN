@@ -38,6 +38,18 @@ export function EvidenceHandoff({ lakeId, refreshKey, receiving = false, preview
   const [data, setData] = useState<Summary>(), [error, setError] = useState('');
   const [kind, setKind] = useState<'links' | 'paths'>('links'), [open, setOpen] = useState(false), [offset, setOffset] = useState(0);
   const [page, setPage] = useState<Page>(), [pageError, setPageError] = useState(''), [loading, setLoading] = useState(false);
+  const [previewCount,setPreviewCount]=useState<number>(),[countLoading,setCountLoading]=useState(false),[countError,setCountError]=useState('');
+  const previewKey=JSON.stringify([lakeId,preview?.policy,preview?.generation,preview?.valid,preview?.matching,data?.matrix?.generation]);
+  useEffect(()=>{
+    setPreviewCount(undefined);setCountError('');setCountLoading(false);
+    if(!preview?.valid||preview.matching!==undefined||!data?.matrix||preview.generation!==data.matrix.generation)return;
+    let active=true;const controller=new AbortController();setCountLoading(true);
+    api<{total:number}>('/discovery/scores/query',{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({...preview.policy,generation:preview.generation,offset:0,limit:1})},lakeId)
+      .then(result=>{if(active)setPreviewCount(result.total);}).catch(e=>{if(active)setCountError(String(e));})
+      .finally(()=>{if(active)setCountLoading(false);});
+    return()=>{active=false;controller.abort();};
+  },[previewKey]);
   const inspector = useRef<HTMLElement>(null);
   const sourcePeek = useSourcePeek(lakeId, `${data?.revision}:${kind}:${offset}:${open}`);
   useEffect(() => {
@@ -73,7 +85,7 @@ export function EvidenceHandoff({ lakeId, refreshKey, receiving = false, preview
     <div className="journey-grid">
       <aside className="journey-card"><h4>Received from scoring</h4><b className="journey-number">{number(data.matrix?.cells)}</b><p>contextual score observations</p><small>Overlapping contexts count separately. Similarity scores are not relationship confidence.</small><p>{number(data.matrix?.rows)} source rows · {number(data.matrix?.text_units)} text spans</p><small>{data.scope ? `${number(data.scope.counts.pairs)} committed source pairs` : 'Whole profiled candidate scope'} · {number(data.matrix?.contexts)} scoring contexts</small></aside>
       <section className="journey-card journey-selection"><h4>{preview ? 'Filter preview & prepared output' : 'How the input was prepared'}</h4>
-        {preview && <div className="journey-preview"><strong>{changed ? 'Current filter preview' : 'Current filters match prepared policy'}</strong><p>{preview.valid && previewCurrent ? `${preview.loading ? 'Calculating…' : number(preview.matching)} matching observations` : 'Choose valid filters for the current scores'}</p><small>{changed ? 'Prepared evidence stays unchanged until you prepare this filter.' : 'Sorting and browsing pages do not change the prepared input.'}</small></div>}
+        {preview && <div className="journey-preview"><strong>{changed ? 'Current filter preview' : 'Current filters match prepared policy'}</strong><p>{preview.valid && previewCurrent ? `${preview.loading||countLoading ? 'Reading saved scores…' : number(preview.matching??previewCount)} matching observations` : 'Choose valid filters for the current scores'}</p>{countError&&<p role="alert">Could not read saved score counts: {countError}</p>}<small>{changed ? 'Prepared evidence stays unchanged until you prepare this filter.' : 'Sorting and browsing pages do not change the prepared input.'}</small></div>}
         {prepared ? <><p className="journey-policy">{policyText(data.policy, data.sources)}</p>{obs ? <ol className="journey-funnel">
           <li><span>Pass score / source / Top-K policy</span><b>{number(obs.matching)}</b><small>{number(obs.outside_filter)} outside this policy</small></li>
           <li><span>After per-row/context bound</span><b>{number(obs.after_row_bound)}</b><small>{number(obs.row_bound_omitted)} omitted · up to {receipt.limits.links_per_row_context} per row/context</small></li>

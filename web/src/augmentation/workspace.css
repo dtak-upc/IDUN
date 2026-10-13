@@ -827,6 +827,8 @@ header.thor-heading,
 /* Stage 11.F Engine selector & Typed badges */
 .thor-engine-selector {
   display: flex;
+  max-width: 100%;
+  min-width: 0;
   align-items: center;
   gap: 8px;
   background: var(--thor-panel);
@@ -836,6 +838,8 @@ header.thor-heading,
   font-size: 12px;
 }
 .thor-engine-selector select {
+  min-width: 0;
+  flex: 1;
   border: none;
   background: transparent;
   color: var(--ink);

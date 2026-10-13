@@ -22,12 +22,46 @@ try{
    if(name==='Knowledge Graph')await expect(page.locator('.kg-heading')).toBeVisible({timeout:90000});
    const trigger=page.locator('.data-journey-trigger:visible');await expect(trigger).toBeVisible({timeout:90000});await trigger.click();
    await expect(page.locator('.data-journey-dialog')).toBeVisible();
-   await page.waitForTimeout(350);
+   if(name==='Data Lake'){
+    await page.getByRole('button',{name:'Inspect received profiling sources',exact:true}).click();
+    const inspector=page.getByRole('region',{name:'Scope pair inspector',exact:true});
+    await expect(inspector.locator('tbody tr').first()).toBeVisible({timeout:90000});
+    for(const column of [0,1]){
+     await inspector.locator('tbody tr').first().locator('td').nth(column).getByRole('button').click();
+     const source=page.getByRole('region',{name:'Expanded source',exact:true});
+     await expect(source.locator(column===0?'tbody tr':'pre').first()).toBeVisible({timeout:90000});
+     await source.getByRole('button',{name:'Collapse source',exact:true}).click();
+    }
+    report.checks.push(lake+': Data Journey table and document expansion');
+   }
+   if(name==='Discover'){
+    await page.getByRole('button',{name:'Scores & evidence',exact:true}).click();
+    for(const type of ['published link entries','shared-span paths']){
+     await page.getByRole('button',{name:new RegExp(type+' ↗$')}).click();
+     await expect(page.getByRole('region',{name:'Published evidence inspector',exact:true}).locator('.journey-evidence-list article').first()).toBeVisible({timeout:90000});
+    }
+    if(lake!=='doc2db')await expect(page.locator('.journey-preview')).not.toContainText(/Unrecorded|Reading saved scores|Calculating/,{timeout:90000});
+    report.checks.push(lake+': published links and join paths');
+   }
+   if(name==='Knowledge Graph'){
+    await page.getByRole('button',{name:'Instance data',exact:true}).click();
+    await expect(page.locator('.data-journey-dialog .journey-evidence-list article').first()).toBeVisible({timeout:90000});
+    report.checks.push(lake+': KG instance journey');
+   }
    const alerts=await page.locator('[role="alert"]:visible').allTextContents();if(alerts.length)throw Error(lake+' '+name+': '+alerts.join(';'));
    for(const width of [1440,768,390]){await page.setViewportSize({width,height:1000});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);}
    await page.keyboard.press('Escape');await page.setViewportSize({width:1440,height:1000});report.views.push({lake,stage:name});
   }
  }
+ for(const width of [320,390,430,600,768]){
+  await page.setViewportSize({width,height:844});
+  const nav=page.getByRole('navigation',{name:'Workspace',exact:true});
+  expect(await nav.locator('.nav-item').evaluateAll(ns=>ns.every(n=>{
+   const label=n.querySelector('.workspace-nav-label'),r=label.getBoundingClientRect(),b=n.getBoundingClientRect();
+   return label.scrollWidth<=label.clientWidth+1&&r.left>=b.left&&r.right<=b.right+1;
+  }))).toBe(true);
+ }
+ await page.setViewportSize({width:1440,height:1000});report.checks.push('Mobile workspace tabs: no overlapping labels at 320–768 px');
  // Exercise exact application endpoints through the compiled browser adapter.
  const adapter=fs.readdirSync(path.join(root,'assets')).find(n=>/^browser-[^.]+\.js$/.test(n));
  const endpoint=async(path,body,method='GET')=>page.evaluate(async({adapter,path,body,method})=>{
@@ -45,5 +79,5 @@ try{
  await page.reload();await expect(lakeSelect).toBeVisible();expect((await endpoint('/knowledge/automatic/get-saved-visual-query',{id:recipe.id},'POST')).title).toBe('Browser validation query');report.checks.push('Visual query and saved query persistence');
  await page.getByRole('button',{name:'Settings',exact:true}).click();await expect(page.getByRole('heading',{name:'Settings & Configuration'})).toBeVisible();await page.waitForTimeout(500);expect(await page.locator('[role="alert"]:visible').allTextContents()).toEqual([]);report.checks.push('Settings render');
  expect(report.errors).toEqual([]);expect(report.requests).toEqual([]);report.status='passed';
-}catch(e){report.status='failed';report.error=String(e);report.alerts=await page?.locator('[role="alert"]:visible').allTextContents();await page?.screenshot({path:'.idun/static-workspace-failure.png'});process.exitCode=1;}
+}catch(e){report.status='failed';report.error=String(e);report.alerts=await page?.locator('[role="alert"]:visible').allTextContents();report.overflow=await page?.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,nodes:[...document.querySelectorAll('body *')].filter(n=>n.getBoundingClientRect().right>innerWidth+1).slice(0,25).map(n=>({tag:n.tagName,cls:n.className,width:n.getBoundingClientRect().width,right:n.getBoundingClientRect().right}))}));await page?.screenshot({path:'.idun/static-workspace-failure.png'});process.exitCode=1;}
 finally{await browser?.close();await new Promise(r=>server.close(r));fs.writeFileSync('.idun/public-workspace-validation.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report));}

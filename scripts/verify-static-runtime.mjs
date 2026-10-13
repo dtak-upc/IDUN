@@ -15,6 +15,7 @@ try{
   const request=(path,body={},method='GET')=>{py.globals.set('_req',JSON.stringify({slug:lake.id,path,method,body}));const v=JSON.parse(py.runPython("r=json.loads(_req);json.dumps(static_runtime.dispatch(r['slug'],r['path'],r['method'],r['body']))"));if(v.code>=400)throw Error(path+': '+v.data.error);return v.data;};
   for(const path of ['/assets','/datasets','/profile/status','/profile','/discovery','/discovery/landscape','/discovery/handoff','/integration','/augmentation/runs','/augmentation/workspace?scope=source','/knowledge']){request(path);checks.push({lake:lake.id,path});}
   const plans=request('/integration').plans;assert.ok(plans.length);
+  if(request('/discovery').matrix){console.log(lake.id,'saved score query');request('/discovery/scores/query',{min_score:-1,max_score:1.01,top_k:0,offset:0,limit:12},'POST');}
   console.log(lake.id,'scope preview');request('/discovery/scope/preview',{generation:request('/profile/graph').graph.generation,recipe:{mode:'all'}},'POST');console.log(lake.id,'scope passed');
   const graph=request('/knowledge/automatic/sync',{runs:plans.map(p=>p.id)},'POST');assert.ok(graph.concepts.length);assert.ok(graph.relationships.length);
   assert.ok(graph.layers.every(l=>l.update_available===!metadata.kg_current[l.run]),'Pending updates must match the local lake');

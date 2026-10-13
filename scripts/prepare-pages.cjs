@@ -22,6 +22,11 @@ for (const name of Object.keys(manifest.files)) {
   fs.copyFileSync(path.join(input,name), destination);
 }
 fs.renameSync(path.join(output,'showcase.html'),path.join(output,'index.html'));
+// Couple the fixed-name Python archive to this frontend build, including cached visitors.
+const lakeManifestPath=path.join(output,'demo/lakes.json');
+const lakeManifest=JSON.parse(fs.readFileSync(lakeManifestPath,'utf8'));
+lakeManifest.runtime_revision=manifest.files['runtime.zip'];
+fs.writeFileSync(lakeManifestPath,JSON.stringify(lakeManifest));
 fs.writeFileSync(path.join(output,'.nojekyll'),'');
 const runtime=path.join(output,'runtime');fs.mkdirSync(runtime,{recursive:true});
 const pyodide=path.dirname(require.resolve('pyodide/package.json'));
